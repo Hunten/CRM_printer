@@ -532,15 +532,28 @@ def main():
                         st.error("❌ Credentials not in secrets!")
                     except Exception as e:
                         st.error(f"❌ Error: {e}")
-    if 'crm' not in st.session_state:
-        if 'drive_storage' not in st.session_state:
+if 'crm' not in st.session_state:
+    # Check if we already have connected drive_storage (from button)
+    if 'drive_storage' in st.session_state and st.session_state.get('drive_storage'):
+        # Already exists, check if it has folder_id
+        if not st.session_state['drive_storage'].folder_id:
+            # No folder_id yet, try to find it
             try:
-                credentials = dict(st.secrets["gcp_service_account"])
-                st.session_state['drive_storage'] = GoogleDriveStorage(credentials)
                 st.session_state['drive_storage'].find_or_create_folder()
             except:
-                st.session_state['drive_storage'] = None
-        st.session_state['crm'] = PrinterServiceCRM(st.session_state.get('drive_storage',None))
+                pass  # Silent fail
+    else:
+        # No drive_storage yet, create and connect
+        try:
+            credentials = dict(st.secrets["gcp_service_account"])
+            drive = GoogleDriveStorage(credentials)
+            drive.find_or_create_folder()
+            st.session_state['drive_storage'] = drive
+        except:
+            st.session_state['drive_storage'] = None
+    
+    st.session_state['crm'] = PrinterServiceCRM(st.session_state.get('drive_storage', None))
+
     crm = st.session_state['crm']
     tab1,tab2,tab3,tab4 = st.tabs(["📥 New Order","📋 All Orders","✏️ Update Order","📊 Reports"])
     with tab1:
