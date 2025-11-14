@@ -14,51 +14,82 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 from PIL import Image
 
+# Page config
 st.set_page_config(page_title="Printer Service CRM", page_icon="🖨️", layout="wide")
 
-# Authentication
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
+
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def check_password():
     if 'authenticated' not in st.session_state:
         st.session_state['authenticated'] = False
+
     if st.session_state['authenticated']:
         return True
+
     st.markdown("## 🔒 Login Required")
+    st.markdown("Please enter your credentials to access the CRM system.")
+
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submit = st.form_submit_button("Login")
+
         if submit:
-            if username == "admin" and hash_password(password) == hash_password("printer123"):
+            correct_username = "admin"
+            # Get password from secrets (secure!)
+            try:
+                correct_password = st.secrets["passwords"]["admin_password"]
+                correct_password_hash = hash_password(correct_password)
+            except KeyError:
+                st.error("❌ Password not configured in secrets!")
+                st.info("Add 'passwords.admin_password' in Streamlit Cloud Settings → Secrets")
+                return False
+
+            if username == correct_username and hash_password(password) == correct_password_hash:
                 st.session_state['authenticated'] = True
                 st.session_state['username'] = username
                 st.success("✅ Login successful!")
                 st.rerun()
             else:
                 st.error("❌ Invalid username or password")
-    st.info("Default: admin / printer123")
+
     return False
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
 
 def remove_diacritics(text):
     if not isinstance(text, str):
         return text
-    diacritics_map = {'ă': 'a', 'Ă': 'A', 'â': 'a', 'Â': 'A', 'î': 'i', 'Î': 'I', 'ș': 's', 'Ș': 'S', 'ț': 't', 'Ț': 'T'}
+    diacritics_map = {
+        'ă': 'a', 'Ă': 'A', 'â': 'a', 'Â': 'A',
+        'î': 'i', 'Î': 'I', 'ș': 's', 'Ș': 'S', 'ț': 't', 'Ț': 'T'
+    }
     for d, r in diacritics_map.items():
         text = text.replace(d, r)
     return text
 
-# Google Drive
+# ============================================================================
+# GOOGLE DRIVE
+# ============================================================================
+
 class GoogleDriveStorage:
     def __init__(self, credentials_dict):
         try:
             credentials = service_account.Credentials.from_service_account_info(
-                credentials_dict, scopes=['https://www.googleapis.com/auth/drive.file'])
+                credentials_dict,
+                scopes=['https://www.googleapis.com/auth/drive.file']
+            )
             self.service = build('drive', 'v3', credentials=credentials)
             self.folder_id = None
         except Exception as e:
-            st.error(f"Drive init failed: {str(e)}")
+            st.error(f"Failed to initialize Google Drive: {str(e)}")
             self.service = None
 
     def find_or_create_folder(self, folder_name="PrinterServiceCRM"):
@@ -70,9 +101,9 @@ class GoogleDriveStorage:
             folders = results.get('files', [])
             if folders:
                 self.folder_id = folders[0]['id']
-                st.sidebar.success(f"📁 Connected!")
+                st.sidebar.success(f"📁 Connected to Drive!")
                 return self.folder_id
-            st.sidebar.warning("⚠️ Folder not found. Share it with service account!")
+            st.sidebar.warning("⚠️ Folder not found. Create and share 'PrinterServiceCRM' folder!")
             try:
                 file_metadata = {'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'}
                 folder = self.service.files().create(body=file_metadata, fields='id').execute()
@@ -134,38 +165,16 @@ class GoogleDriveStorage:
             st.sidebar.error(f"Load error: {str(e)}")
             return pd.DataFrame()
 
-# PDF Functions
+# ============================================================================
+# PDF GENERATION - INITIAL RECEIPT
+# ============================================================================
+
 def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     buffer = io.BytesIO()
     width, height = 210 * mm, 148.5 * mm
     c = canvas.Canvas(buffer, pagesize=(width, height))
 
-    # ========== HEADER SECTION - NEW LAYOUT ==========
-    header_y_start = height - 10*mm
-
-    # LEFT: Business Details
-    x_business = 10*mm
-    y_pos = header_y_start
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(x_business, y_pos, remove_diacritics(company_info.get('company_name', '')))
-    y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
-    c.drawString(x_business, y_pos, remove_diacritics(company_info.get('company_address', '')))
-    y_pos -= 3*mm
-    c.drawString(x_business, y_pos, f"CUI: {company_info.get('cui', '')}")
-    y_pos -= 3*mm
-    c.drawString(x_business, y_pos, f"Reg.Com: {company_info.get('reg_com', '')}")
-    y_pos -= 3*mm
-    c.drawString(x_business, y_pos, f"Tel: {company_info.get('phone', '')}")
-    y_pos -= 3*mm
-    c.drawString(x_business, y_pos, company_info.get('email', ''))
-
-    # CENTER: Logo
-    logo_x = 85*mm
-    logo_y = header_y_start - 20*mm
-    logo_width = 40*mm
-    logo_height = 25*mm
-
+    # Logo
     if logo_image:
         try:
             logo = Image.open(logo_image)
@@ -173,42 +182,37 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
             logo_buffer = io.BytesIO()
             logo.save(logo_buffer, format='PNG')
             logo_buffer.seek(0)
-            c.drawImage(ImageReader(logo_buffer), logo_x, logo_y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
+            c.drawImage(ImageReader(logo_buffer), 10*mm, height - 30*mm, width=40*mm, height=25*mm, preserveAspectRatio=True, mask='auto')
         except:
             c.setFillColor(colors.HexColor('#f0f0f0'))
-            c.rect(logo_x, logo_y, logo_width, logo_height, fill=1, stroke=1)
+            c.rect(10*mm, height - 30*mm, 40*mm, 25*mm, fill=1, stroke=1)
             c.setFillColor(colors.black)
             c.setFont("Helvetica-Bold", 10)
-            c.drawCentredString(logo_x + (logo_width/2), logo_y + (logo_height/2), "[LOGO]")
+            c.drawString(15*mm, height - 20*mm, "[LOGO]")
     else:
         c.setFillColor(colors.HexColor('#f0f0f0'))
-        c.rect(logo_x, logo_y, logo_width, logo_height, fill=1, stroke=1)
+        c.rect(10*mm, height - 30*mm, 40*mm, 25*mm, fill=1, stroke=1)
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 10)
-        c.drawCentredString(logo_x + (logo_width/2), logo_y + (logo_height/2), "[LOGO]")
+        c.drawString(15*mm, height - 20*mm, "[LOGO]")
 
     c.setFillColor(colors.black)
-
-    # RIGHT: Client Details
-    x_client = 155*mm
-    y_pos = header_y_start
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(x_client, y_pos, "CLIENT")
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(10*mm, height - 35*mm, remove_diacritics(company_info.get('company_name', '')))
+    c.setFont("Helvetica", 8)
+    y_pos = height - 40*mm
+    c.drawString(10*mm, y_pos, remove_diacritics(company_info.get('company_address', '')))
     y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
-    c.drawString(x_client, y_pos, f"Nume:")
-    y_pos -= 3*mm
-    client_name = remove_diacritics(order['client_name'])
-    if len(client_name) > 20:
-        c.drawString(x_client, y_pos, client_name[:20])
-        y_pos -= 3*mm
-        c.drawString(x_client, y_pos, client_name[20:40])
-    else:
-        c.drawString(x_client, y_pos, client_name)
-    y_pos -= 3*mm
-    c.drawString(x_client, y_pos, f"Tel:")
-    y_pos -= 3*mm
-    c.drawString(x_client, y_pos, order['client_phone'])
+    c.drawString(10*mm, y_pos, f"CUI: {company_info.get('cui', '')} | Reg.Com: {company_info.get('reg_com', '')}")
+    y_pos -= 3.5*mm
+    c.drawString(10*mm, y_pos, f"Tel: {company_info.get('phone', '')} | {company_info.get('email', '')}")
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(120*mm, height - 15*mm, "CLIENT")
+    c.setFont("Helvetica", 8)
+    y_pos = height - 20*mm
+    c.drawString(120*mm, y_pos, f"Nume: {remove_diacritics(order['client_name'])}")
+    y_pos -= 3.5*mm
+    c.drawString(120*mm, y_pos, f"Tel: {order['client_phone']}")
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(105*mm, height - 55*mm, "BON PREDARE ECHIPAMENT IN SERVICE")
     c.setFont("Helvetica-Bold", 10)
@@ -267,22 +271,18 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     buffer.seek(0)
     return buffer
 
-# ============================================================================
-# COPY THIS ENTIRE FUNCTION - Replace generate_completion_receipt_pdf
-# ============================================================================
 
 # ============================================================================
-# FINAL VERSION - Replace generate_completion_receipt_pdf function
+# PDF GENERATION - COMPLETION RECEIPT (3-COLUMN LAYOUT)
 # ============================================================================
-
 
 def generate_completion_receipt_pdf(order, company_info, logo_image=None):
-    '''Completion PDF - CENTERED LOGO, BUSINESS LEFT, CLIENT RIGHT, COMPACT'''
+    '''Completion PDF - CENTERED LOGO, BUSINESS LEFT, CLIENT RIGHT, 3 COLUMNS'''
     buffer = io.BytesIO()
     width, height = 210 * mm, 148.5 * mm
     c = canvas.Canvas(buffer, pagesize=(width, height))
 
-    # ========== HEADER SECTION - NEW LAYOUT ==========
+    # ========== HEADER SECTION ==========
     header_y_start = height - 10*mm
 
     # LEFT: Business Details
@@ -352,7 +352,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     y_pos -= 3*mm
     c.drawString(x_client, y_pos, order['client_phone'])
 
-    # ========== TITLE - Shifted up ==========
+    # ========== TITLE ==========
     title_y = height - 38*mm
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(105*mm, title_y, "BON FINALIZARE REPARATIE")
@@ -361,7 +361,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawCentredString(105*mm, title_y - 6*mm, f"Nr. Comanda: {order['order_id']}")
     c.setFillColor(colors.black)
 
-    # ========== 3 COLUMNS - Shifted up ==========
+    # ========== 3 COLUMNS ==========
     y_start = height - 50*mm
     col_width = 63*mm
 
@@ -372,21 +372,17 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_left, y_pos, "DETALII ECHIPAMENT:")
     y_pos -= 3.5*mm
     c.setFont("Helvetica", 7)
-
     printer_info = f"{remove_diacritics(order['printer_brand'])} {remove_diacritics(order['printer_model'])}"
     if len(printer_info) > 25:
         printer_info = printer_info[:25] + "..."
     c.drawString(x_left, y_pos, printer_info)
     y_pos -= 2.5*mm
-
     serial = order.get('printer_serial', 'N/A')
     if len(serial) > 20:
         serial = serial[:20] + "..."
     c.drawString(x_left, y_pos, f"Serie: {serial}")
     y_pos -= 2.5*mm
-
     c.drawString(x_left, y_pos, f"Predare: {order['date_received']}")
-
     if order.get('date_completed'):
         y_pos -= 2.5*mm
         c.drawString(x_left, y_pos, f"Finalizare: {order['date_completed']}")
@@ -398,13 +394,11 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_middle, y_pos, "REPARATII EFECTUATE:")
     y_pos -= 3.5*mm
     c.setFont("Helvetica", 7)
-
     repair_text = remove_diacritics(order.get('repair_details', 'N/A'))
     words = repair_text.split()
     line = ""
     line_count = 0
     max_lines = 5
-
     for word in words:
         test_line = line + word + " "
         if c.stringWidth(test_line, "Helvetica", 7) < (col_width - 2*mm):
@@ -417,7 +411,6 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
                 line = word + " "
             else:
                 break
-
     if line and line_count < max_lines:
         c.drawString(x_middle, y_pos, line.strip())
 
@@ -428,12 +421,10 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_right, y_pos, "PIESE UTILIZATE:")
     y_pos -= 3.5*mm
     c.setFont("Helvetica", 7)
-
     parts_text = remove_diacritics(order.get('parts_used', 'N/A'))
     words = parts_text.split()
     line = ""
     line_count = 0
-
     for word in words:
         test_line = line + word + " "
         if c.stringWidth(test_line, "Helvetica", 7) < (col_width - 2*mm):
@@ -446,23 +437,18 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
                 line = word + " "
             else:
                 break
-
     if line and line_count < max_lines:
         c.drawString(x_right, y_pos, line.strip())
 
-    # ========== COST TABLE - Shifted up ==========
+    # ========== COST TABLE ==========
     y_cost = height - 78*mm
     c.setFont("Helvetica-Bold", 9)
     c.drawString(10*mm, y_cost, "COSTURI:")
-
     y_cost -= 4*mm
     table_x = 10*mm
     table_width = 70*mm
     row_height = 5*mm
-
     c.rect(table_x, y_cost - (4 * row_height), table_width, 4 * row_height)
-
-    # Header
     c.setFillColor(colors.HexColor('#e0e0e0'))
     c.rect(table_x, y_cost - row_height, table_width, row_height, fill=1)
     c.setFillColor(colors.black)
@@ -470,23 +456,17 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(table_x + 2*mm, y_cost - row_height + 1.5*mm, "Descriere")
     c.drawString(table_x + table_width - 22*mm, y_cost - row_height + 1.5*mm, "Suma (RON)")
     c.line(table_x, y_cost - row_height, table_x + table_width, y_cost - row_height)
-
-    # Labor
     y_cost -= row_height
     c.setFont("Helvetica", 8)
     c.drawString(table_x + 2*mm, y_cost - row_height + 1.5*mm, "Manopera (Labor)")
     labor = float(order.get('labor_cost', 0))
     c.drawString(table_x + table_width - 22*mm, y_cost - row_height + 1.5*mm, f"{labor:.2f}")
     c.line(table_x, y_cost - row_height, table_x + table_width, y_cost - row_height)
-
-    # Parts
     y_cost -= row_height
     c.drawString(table_x + 2*mm, y_cost - row_height + 1.5*mm, "Piese (Parts)")
     parts = float(order.get('parts_cost', 0))
     c.drawString(table_x + table_width - 22*mm, y_cost - row_height + 1.5*mm, f"{parts:.2f}")
     c.line(table_x, y_cost - row_height, table_x + table_width, y_cost - row_height)
-
-    # Total
     y_cost -= row_height
     c.setFillColor(colors.HexColor('#f0f0f0'))
     c.rect(table_x, y_cost - row_height, table_width, row_height, fill=1)
@@ -496,45 +476,32 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     total = float(order.get('total_cost', labor + parts))
     c.drawString(table_x + table_width - 22*mm, y_cost - row_height + 1.5*mm, f"{total:.2f}")
 
-    # ========== SIGNATURES - Stay at bottom ==========
+    # ========== SIGNATURES ==========
     sig_y = 22*mm
     sig_height = 18*mm
-
     c.rect(10*mm, sig_y, 85*mm, sig_height)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(12*mm, sig_y + sig_height - 3*mm, "OPERATOR SERVICE")
     c.setFont("Helvetica", 7)
     c.drawString(12*mm, sig_y + 2*mm, "Semnatura si Stampila")
-
     c.rect(115*mm, sig_y, 85*mm, sig_height)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(117*mm, sig_y + sig_height - 3*mm, "CLIENT")
     c.setFont("Helvetica", 7)
     c.drawString(117*mm, sig_y + sig_height - 7*mm, f"Nume: {remove_diacritics(order['client_name'])}")
     c.drawString(117*mm, sig_y + 2*mm, "Semnatura")
-
-    # Footer
     c.setFont("Helvetica", 6)
     c.drawCentredString(105*mm, 3*mm, "Acest document constituie factura si dovada finalizarii reparatiei.")
     c.setDash(3, 3)
     c.line(5*mm, 1*mm, 205*mm, 1*mm)
-
     c.save()
     buffer.seek(0)
     return buffer
 
-
 # ============================================================================
-# END OF FUNCTION
-# ============================================================================
-
-
-# ============================================================================
-# END OF FUNCTION - Do not copy below this line
+# CRM CLASS
 # ============================================================================
 
-
-# CRM Class
 class PrinterServiceCRM:
     def __init__(self, drive_storage=None):
         self.drive_storage = drive_storage
@@ -595,7 +562,11 @@ class PrinterServiceCRM:
             return pd.DataFrame(self.service_orders)
         return pd.DataFrame()
 
-# Main App
+
+# ============================================================================
+# MAIN APP
+# ============================================================================
+
 def main():
     if not check_password():
         st.stop()
@@ -605,9 +576,12 @@ def main():
 
     if 'company_info' not in st.session_state:
         st.session_state['company_info'] = {
-            'company_name': 'Print Service Pro SRL', 'company_address': 'Str. Industriei Nr. 45, Cluj-Napoca',
-            'cui': 'RO98765432', 'reg_com': 'J12/5678/2024',
-            'phone': '+40 364 123 456', 'email': 'service@printservicepro.ro'
+            'company_name': 'Print Service Pro SRL',
+            'company_address': 'Str. Industriei Nr. 45, Cluj-Napoca',
+            'cui': 'RO98765432',
+            'reg_com': 'J12/5678/2024',
+            'phone': '+40 364 123 456',
+            'email': 'service@printservicepro.ro'
         }
     if 'last_created_order' not in st.session_state:
         st.session_state['last_created_order'] = None
@@ -621,6 +595,7 @@ def main():
             st.session_state['authenticated'] = False
             st.rerun()
         st.divider()
+
         with st.expander("🖼️ Company Logo", expanded=False):
             uploaded_logo = st.file_uploader("Upload logo", type=['png', 'jpg', 'jpeg'])
             if uploaded_logo:
@@ -629,6 +604,7 @@ def main():
                 st.image(uploaded_logo, width=150)
             elif st.session_state['logo_image']:
                 st.image(st.session_state['logo_image'], width=150)
+
         with st.expander("🏢 Company Details", expanded=False):
             st.session_state['company_info']['company_name'] = st.text_input("Company", value=st.session_state['company_info']['company_name'])
             st.session_state['company_info']['company_address'] = st.text_input("Address", value=st.session_state['company_info']['company_address'])
@@ -636,24 +612,38 @@ def main():
             st.session_state['company_info']['reg_com'] = st.text_input("Reg.Com", value=st.session_state['company_info']['reg_com'])
             st.session_state['company_info']['phone'] = st.text_input("Phone", value=st.session_state['company_info']['phone'])
             st.session_state['company_info']['email'] = st.text_input("Email", value=st.session_state['company_info']['email'])
+
         with st.expander("☁️ Google Drive", expanded=False):
-            st.warning("Share 'PrinterServiceCRM' folder!")
-            st.info("printer-crm-storage@gen-lang-client-0837467127.iam.gserviceaccount.com")
-            credentials_text = st.text_area("Service Account JSON", height=150)
-            if st.button("💾 Connect"):
-                if credentials_text:
+            if 'drive_storage' in st.session_state and st.session_state.get('drive_storage'):
+                st.success("✅ Connected to Google Drive!")
+            else:
+                st.warning("⚠️ Not connected")
+                if st.button("🔄 Connect to Drive"):
                     try:
-                        credentials_dict = json.loads(credentials_text)
-                        st.session_state['drive_storage'] = GoogleDriveStorage(credentials_dict)
+                        credentials = dict(st.secrets["gcp_service_account"])
+                        st.session_state['drive_storage'] = GoogleDriveStorage(credentials)
                         folder_id = st.session_state['drive_storage'].find_or_create_folder()
                         if folder_id:
                             st.session_state['crm'] = PrinterServiceCRM(st.session_state['drive_storage'])
                             st.success("✅ Connected!")
                             st.rerun()
+                        else:
+                            st.error("❌ Failed. Share 'PrinterServiceCRM' folder!")
+                    except KeyError:
+                        st.error("❌ Credentials not in secrets!")
+                        st.info("Add 'gcp_service_account' in Settings → Secrets")
                     except Exception as e:
-                        st.error(f"❌ {str(e)}")
+                        st.error(f"❌ Error: {str(e)}")
 
+    # Initialize CRM with auto-connect
     if 'crm' not in st.session_state:
+        if 'drive_storage' not in st.session_state:
+            try:
+                credentials = dict(st.secrets["gcp_service_account"])
+                st.session_state['drive_storage'] = GoogleDriveStorage(credentials)
+                st.session_state['drive_storage'].find_or_create_folder()
+            except:
+                st.session_state['drive_storage'] = None
         st.session_state['crm'] = PrinterServiceCRM(st.session_state.get('drive_storage', None))
     crm = st.session_state['crm']
 
@@ -751,7 +741,7 @@ def main():
                             st.rerun()
                     st.divider()
                     st.subheader("📄 Download Receipts")
-                    st.info("Both PDFs available - choose what you need!")
+                    st.info("Both PDFs available!")
                     logo = st.session_state.get('logo_image', None)
                     col1, col2 = st.columns(2)
                     with col1:
