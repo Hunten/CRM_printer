@@ -162,7 +162,7 @@ def save_dataframe(self, df, filename="crm_database.csv"):
             return pd.DataFrame()
         try:
             query = f"name='{filename}' and '{self.folder_id}' in parents and trashed=false"
-            results = self.service.files().list(q=query, fields="files(id)", spaces='drive').execute()
+            results = self.service.files().list(q=query, fields="files(id)", spaces='drive',supportsAllDrives=True).execute()
             files = results.get('files', [])
             if not files:
                 st.sidebar.info("📄 No database. Starting fresh.")
