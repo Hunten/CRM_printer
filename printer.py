@@ -117,7 +117,8 @@ def save_dataframe(self, df, filename="crm_database.csv"):
             q=query, 
             fields="files(id)",
             spaces='drive',
-            supportsAllDrives=True  # ← CRITICAL!
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True# ← CRITICAL!
         ).execute()
         files = results.get('files', [])
         
@@ -162,7 +163,7 @@ def save_dataframe(self, df, filename="crm_database.csv"):
             return pd.DataFrame()
         try:
             query = f"name='{filename}' and '{self.folder_id}' in parents and trashed=false"
-            results = self.service.files().list(q=query, fields="files(id)", spaces='drive',supportsAllDrives=True).execute()
+            results = self.service.files().list(q=query, fields="files(id)", spaces='drive',supportsAllDrives=True,includeItemsFromAllDrives=True).execute()
             files = results.get('files', [])
             if not files:
                 st.sidebar.info("📄 No database. Starting fresh.")
@@ -498,14 +499,27 @@ class PrinterServiceCRM:
         self.next_order_id = 1
         self.load_from_storage()
 
-    def load_from_storage(self):
-        if self.drive_storage:
-            df = self.drive_storage.load_dataframe()
-            if not df.empty:
-                self.service_orders = df.to_dict('records')
-                if self.service_orders:
-                    max_id = max([int(o['order_id'].split('-')[1]) for o in self.service_orders])
-                    self.next_order_id = max_id + 1
+def load_from_storage(self):
+    if self.drive_storage is None:
+        return  # Don't try to load if no storage
+    
+    # Only load if folder_id is set
+    if not hasattr(self.drive_storage, 'folder_id'):
+        return
+    
+    if not self.drive_storage.folder_id:
+        return  # No folder connected yet
+    
+    try:
+        df = self.drive_storage.load_dataframe()
+        if not df.empty:
+            self.service_orders = df.to_dict('records')
+            if self.service_orders:
+                max_id = max([int(o['order_id'].split('-')[1]) for o in self.service_orders])
+                self.next_order_id = max_id + 1
+    except Exception as e:
+        pass  # Silent fail - app can still work
+
 
     def save_to_storage(self):
         if self.drive_storage and self.service_orders:
