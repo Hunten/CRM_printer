@@ -22,7 +22,12 @@ st.set_page_config(
     page_icon="🖨️",
     layout="wide"
 )
-
+st.sidebar.write("🔍 DEBUG GSHEETS")
+try:
+    st.sidebar.write("Spreadsheet URL:", st.secrets["connections"]["gsheets"]["spreadsheet"])
+    st.sidebar.write("Service account:", st.secrets["connections"]["gsheets"]["client_email"])
+except Exception as e:
+    st.sidebar.write("Secrets error:", e)
 
 # -------------------------------------------------------------------
 # AUTH
