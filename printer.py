@@ -117,7 +117,7 @@ class GoogleDriveStorage:
                 st.sidebar.success("💾 Saved!")
             else:
                 file_metadata = {'name': filename, 'parents': [self.folder_id]}
-                self.service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+                self.service.files().create(body=file_metadata, media_body=media).execute()
                 st.sidebar.success("💾 Created!")
             return True
         except Exception as e:
