@@ -94,35 +94,68 @@ class GoogleDriveStorage:
             st.sidebar.error(f"Folder error: {str(e)}")
             return None
 
-    def save_dataframe(self, df, filename="crm_database.csv"):
-        if not self.service:
-            return False
-        # CRITICAL FIX: Ensure folder_id exists before saving
+def save_dataframe(self, df, filename="crm_database.csv"):
+    if not self.service:
+        st.sidebar.error("❌ No service!")
+        return False
+    
+    if not self.folder_id:
+        st.sidebar.warning("Finding folder...")
+        self.find_or_create_folder()
         if not self.folder_id:
-            st.sidebar.warning("Finding folder...")
-            self.find_or_create_folder()
-            if not self.folder_id:
-                st.sidebar.error("❌ Cannot save - folder not accessible!")
-                return False
-        try:
-            csv_buffer = io.StringIO()
-            df.to_csv(csv_buffer, index=False)
-            csv_buffer.seek(0)
-            query = f"name='{filename}' and '{self.folder_id}' in parents and trashed=false"
-            results = self.service.files().list(q=query, fields="files(id)", spaces='drive').execute()
-            files = results.get('files', [])
-            media = MediaIoBaseUpload(io.BytesIO(csv_buffer.getvalue().encode()), mimetype='text/csv')
-            if files:
-                self.service.files().update(fileId=files[0]['id'], media_body=media).execute()
-                st.sidebar.success("💾 Saved!")
-            else:
-                file_metadata = {'name': filename, 'parents': [self.folder_id]}
-                self.service.files().create(body=file_metadata, media_body=media).execute()
-                st.sidebar.success("💾 Created!")
-            return True
-        except Exception as e:
-            st.sidebar.error(f"Save error: {str(e)}")
+            st.sidebar.error("❌ No folder!")
             return False
+    
+    try:
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_buffer.seek(0)
+        
+        # Search with supportsAllDrives
+        query = f"name='{filename}' and '{self.folder_id}' in parents and trashed=false"
+        results = self.service.files().list(
+            q=query, 
+            fields="files(id)",
+            spaces='drive',
+            supportsAllDrives=True  # ← CRITICAL!
+        ).execute()
+        files = results.get('files', [])
+        
+        media = MediaIoBaseUpload(
+            io.BytesIO(csv_buffer.getvalue().encode()), 
+            mimetype='text/csv',
+            resumable=True  # ← More reliable
+        )
+        
+        if files:
+            # Update with supportsAllDrives
+            file_id = files[0]['id']
+            self.service.files().update(
+                fileId=file_id, 
+                media_body=media,
+                supportsAllDrives=True  # ← CRITICAL!
+            ).execute()
+            st.sidebar.success("💾 Saved!")
+        else:
+            # Create with supportsAllDrives
+            file_metadata = {
+                'name': filename,
+                'parents': [self.folder_id]
+            }
+            self.service.files().create(
+                body=file_metadata,
+                media_body=media,
+                supportsAllDrives=True  # ← CRITICAL!
+            ).execute()
+            st.sidebar.success("💾 Created!")
+        
+        return True
+        
+    except Exception as e:
+        st.sidebar.error(f"Save error: {str(e)}")
+        import traceback
+        st.sidebar.code(traceback.format_exc())
+        return False
 
     def load_dataframe(self, filename="crm_database.csv"):
         if not self.service or not self.folder_id:
