@@ -62,7 +62,7 @@ def remove_diacritics(text):
     return text
 
 # ============================================================================
-# GOOGLE DRIVE - FIXED FOR STORAGE QUOTA
+# GOOGLE DRIVE - COMPLETE FIX
 # ============================================================================
 
 class GoogleDriveStorage:
@@ -81,7 +81,13 @@ class GoogleDriveStorage:
             return None
         try:
             query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            results = self.service.files().list(q=query, fields="files(id, name)", spaces='drive').execute()
+            results = self.service.files().list(
+                q=query, 
+                fields="files(id, name)", 
+                spaces='drive',
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
             folders = results.get('files', [])
             if folders:
                 self.folder_id = folders[0]['id']
@@ -94,80 +100,82 @@ class GoogleDriveStorage:
             st.sidebar.error(f"Folder error: {str(e)}")
             return None
 
-def save_dataframe(self, df, filename="crm_database.csv"):
-    if not self.service:
-        st.sidebar.error("❌ No service!")
-        return False
-    
-    if not self.folder_id:
-        st.sidebar.warning("Finding folder...")
-        self.find_or_create_folder()
-        if not self.folder_id:
-            st.sidebar.error("❌ No folder!")
+    def save_dataframe(self, df, filename="crm_database.csv"):
+        if not self.service:
             return False
-    
-    try:
-        csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
-        csv_buffer.seek(0)
-        
-        # Search with supportsAllDrives
-        query = f"name='{filename}' and '{self.folder_id}' in parents and trashed=false"
-        results = self.service.files().list(
-            q=query, 
-            fields="files(id)",
-            spaces='drive',
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True# ← CRITICAL!
-        ).execute()
-        files = results.get('files', [])
-        
-        media = MediaIoBaseUpload(
-            io.BytesIO(csv_buffer.getvalue().encode()), 
-            mimetype='text/csv',
-            resumable=True  # ← More reliable
-        )
-        
-        if files:
-            # Update with supportsAllDrives
-            file_id = files[0]['id']
-            self.service.files().update(
-                fileId=file_id, 
-                media_body=media,
-                supportsAllDrives=True  # ← CRITICAL!
+
+        if not self.folder_id:
+            self.find_or_create_folder()
+            if not self.folder_id:
+                return False
+
+        try:
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
+
+            query = f"name='{filename}' and '{self.folder_id}' in parents and trashed=false"
+            results = self.service.files().list(
+                q=query, 
+                fields="files(id)",
+                spaces='drive',
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
             ).execute()
-            st.sidebar.success("💾 Saved!")
-        else:
-            # Create with supportsAllDrives
-            file_metadata = {
-                'name': filename,
-                'parents': [self.folder_id]
-            }
-            self.service.files().create(
-                body=file_metadata,
-                media_body=media,
-                supportsAllDrives=True  # ← CRITICAL!
-            ).execute()
-            st.sidebar.success("💾 Created!")
-        
-        return True
-        
-    except Exception as e:
-        st.sidebar.error(f"Save error: {str(e)}")
-        import traceback
-        st.sidebar.code(traceback.format_exc())
-        return False
+            files = results.get('files', [])
+
+            media = MediaIoBaseUpload(
+                io.BytesIO(csv_buffer.getvalue().encode()), 
+                mimetype='text/csv'
+            )
+
+            if files:
+                file_id = files[0]['id']
+                self.service.files().update(
+                    fileId=file_id, 
+                    media_body=media,
+                    supportsAllDrives=True
+                ).execute()
+                st.sidebar.success("💾 Saved to Drive!")
+            else:
+                file_metadata = {
+                    'name': filename,
+                    'parents': [self.folder_id]
+                }
+                self.service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    supportsAllDrives=True
+                ).execute()
+                st.sidebar.success("💾 Created in Drive!")
+
+            return True
+
+        except Exception as e:
+            st.sidebar.error(f"Save error: {str(e)}")
+            return False
 
     def load_dataframe(self, filename="crm_database.csv"):
-        if not self.service or not self.folder_id:
+        if not self.service:
             return pd.DataFrame()
+
+        if not self.folder_id:
+            return pd.DataFrame()
+
         try:
             query = f"name='{filename}' and '{self.folder_id}' in parents and trashed=false"
-            results = self.service.files().list(q=query, fields="files(id)", spaces='drive',supportsAllDrives=True,includeItemsFromAllDrives=True).execute()
+            results = self.service.files().list(
+                q=query, 
+                fields="files(id)", 
+                spaces='drive',
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
             files = results.get('files', [])
+
             if not files:
-                st.sidebar.info("📄 No database. Starting fresh.")
                 return pd.DataFrame()
+
             file_id = files[0]['id']
             request = self.service.files().get_media(fileId=file_id)
             fh = io.BytesIO()
@@ -177,11 +185,10 @@ def save_dataframe(self, df, filename="crm_database.csv"):
                 status, done = downloader.next_chunk()
             fh.seek(0)
             df = pd.read_csv(fh)
-            st.sidebar.success(f"📄 Loaded {len(df)} orders!")
             return df
         except Exception as e:
-            st.sidebar.error(f"Load error: {str(e)}")
             return pd.DataFrame()
+
 
 # ============================================================================
 # PDF GENERATION - INITIAL RECEIPT
@@ -488,8 +495,9 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     buffer.seek(0)
     return buffer
 
+
 # ============================================================================
-# CRM CLASS
+# CRM CLASS - WITH SAFE LOAD_FROM_STORAGE
 # ============================================================================
 
 class PrinterServiceCRM:
@@ -499,27 +507,30 @@ class PrinterServiceCRM:
         self.next_order_id = 1
         self.load_from_storage()
 
-def load_from_storage(self):
-    if self.drive_storage is None:
-        return  # Don't try to load if no storage
-    
-    # Only load if folder_id is set
-    if not hasattr(self.drive_storage, 'folder_id'):
-        return
-    
-    if not self.drive_storage.folder_id:
-        return  # No folder connected yet
-    
-    try:
-        df = self.drive_storage.load_dataframe()
-        if not df.empty:
-            self.service_orders = df.to_dict('records')
-            if self.service_orders:
-                max_id = max([int(o['order_id'].split('-')[1]) for o in self.service_orders])
-                self.next_order_id = max_id + 1
-    except Exception as e:
-        pass  # Silent fail - app can still work
+    def load_from_storage(self):
+        # CRITICAL FIX: Check if drive_storage exists and is properly initialized
+        if self.drive_storage is None:
+            return  # No storage, start fresh
 
+        # Check if drive_storage has folder_id attribute
+        if not hasattr(self.drive_storage, 'folder_id'):
+            return  # Not initialized yet
+
+        # Check if folder_id is set
+        if not self.drive_storage.folder_id:
+            return  # No folder connected yet
+
+        # Try to load, but don't fail if it doesn't work
+        try:
+            df = self.drive_storage.load_dataframe()
+            if not df.empty:
+                self.service_orders = df.to_dict('records')
+                if self.service_orders:
+                    max_id = max([int(o['order_id'].split('-')[1]) for o in self.service_orders])
+                    self.next_order_id = max_id + 1
+        except Exception as e:
+            # Silent fail - app can still work without loading old data
+            pass
 
     def save_to_storage(self):
         if self.drive_storage and self.service_orders:
@@ -528,7 +539,29 @@ def load_from_storage(self):
         return False
 
     def create_service_order(self, client_name, client_phone, client_email, printer_brand, printer_model, printer_serial, issue_description, accessories, notes, date_received, date_pickup):
-        order = {'order_id':f"SRV-{self.next_order_id:05d}",'client_name':client_name,'client_phone':client_phone,'client_email':client_email,'printer_brand':printer_brand,'printer_model':printer_model,'printer_serial':printer_serial,'issue_description':issue_description,'accessories':accessories,'notes':notes,'date_received':date_received.strftime("%Y-%m-%d") if date_received else datetime.now().strftime("%Y-%m-%d"),'date_pickup_scheduled':date_pickup.strftime("%Y-%m-%d") if date_pickup else '','date_completed':'','date_picked_up':'','status':'Received','technician':'','repair_details':'','parts_used':'','labor_cost':0.0,'parts_cost':0.0,'total_cost':0.0}
+        order = {
+            'order_id': f"SRV-{self.next_order_id:05d}",
+            'client_name': client_name,
+            'client_phone': client_phone,
+            'client_email': client_email,
+            'printer_brand': printer_brand,
+            'printer_model': printer_model,
+            'printer_serial': printer_serial,
+            'issue_description': issue_description,
+            'accessories': accessories,
+            'notes': notes,
+            'date_received': date_received.strftime("%Y-%m-%d") if date_received else datetime.now().strftime("%Y-%m-%d"),
+            'date_pickup_scheduled': date_pickup.strftime("%Y-%m-%d") if date_pickup else '',
+            'date_completed': '',
+            'date_picked_up': '',
+            'status': 'Received',
+            'technician': '',
+            'repair_details': '',
+            'parts_used': '',
+            'labor_cost': 0.0,
+            'parts_cost': 0.0,
+            'total_cost': 0.0
+        }
         self.service_orders.append(order)
         self.next_order_id += 1
         self.save_to_storage()
@@ -545,7 +578,7 @@ def load_from_storage(self):
         if order:
             order.update(kwargs)
             if 'labor_cost' in kwargs or 'parts_cost' in kwargs:
-                order['total_cost'] = float(order.get('labor_cost',0)) + float(order.get('parts_cost',0))
+                order['total_cost'] = float(order.get('labor_cost', 0)) + float(order.get('parts_cost', 0))
             self.save_to_storage()
             return True
         return False
@@ -561,15 +594,12 @@ def load_from_storage(self):
 # ============================================================================
 
 def main():
-    # MUST check password FIRST
     if not check_password():
         st.stop()
 
-    # Title
     st.title("🖨️ Printer Service CRM")
     st.markdown("### Professional Printer Service Management System")
 
-    # Initialize session state
     if 'company_info' not in st.session_state:
         st.session_state['company_info'] = {
             'company_name': 'Print Service Pro SRL',
@@ -584,18 +614,14 @@ def main():
     if 'logo_image' not in st.session_state:
         st.session_state['logo_image'] = None
 
-    # ========== SIDEBAR ==========
     with st.sidebar:
         st.header("⚙️ Configuration")
         st.success(f"👤 {st.session_state.get('username', 'User')}")
-
         if st.button("🚪 Logout", key="logout_btn"):
             st.session_state['authenticated'] = False
             st.rerun()
-
         st.divider()
 
-        # Logo Upload
         with st.expander("🖼️ Company Logo", expanded=False):
             uploaded_logo = st.file_uploader("Upload logo (PNG/JPG)", type=['png', 'jpg', 'jpeg'], key="logo_uploader")
             if uploaded_logo:
@@ -605,113 +631,64 @@ def main():
             elif st.session_state['logo_image']:
                 st.image(st.session_state['logo_image'], width=150)
 
-        # Company Details
         with st.expander("🏢 Company Details", expanded=False):
-            st.session_state['company_info']['company_name'] = st.text_input(
-                "Company Name", 
-                value=st.session_state['company_info']['company_name'],
-                key="company_name_input"
-            )
-            st.session_state['company_info']['company_address'] = st.text_input(
-                "Address", 
-                value=st.session_state['company_info']['company_address'],
-                key="company_address_input"
-            )
-            st.session_state['company_info']['cui'] = st.text_input(
-                "CUI", 
-                value=st.session_state['company_info']['cui'],
-                key="company_cui_input"
-            )
-            st.session_state['company_info']['reg_com'] = st.text_input(
-                "Reg.Com", 
-                value=st.session_state['company_info']['reg_com'],
-                key="company_regcom_input"
-            )
-            st.session_state['company_info']['phone'] = st.text_input(
-                "Phone", 
-                value=st.session_state['company_info']['phone'],
-                key="company_phone_input"
-            )
-            st.session_state['company_info']['email'] = st.text_input(
-                "Email", 
-                value=st.session_state['company_info']['email'],
-                key="company_email_input"
-            )
+            st.session_state['company_info']['company_name'] = st.text_input("Company Name", value=st.session_state['company_info']['company_name'], key="company_name_input")
+            st.session_state['company_info']['company_address'] = st.text_input("Address", value=st.session_state['company_info']['company_address'], key="company_address_input")
+            st.session_state['company_info']['cui'] = st.text_input("CUI", value=st.session_state['company_info']['cui'], key="company_cui_input")
+            st.session_state['company_info']['reg_com'] = st.text_input("Reg.Com", value=st.session_state['company_info']['reg_com'], key="company_regcom_input")
+            st.session_state['company_info']['phone'] = st.text_input("Phone", value=st.session_state['company_info']['phone'], key="company_phone_input")
+            st.session_state['company_info']['email'] = st.text_input("Email", value=st.session_state['company_info']['email'], key="company_email_input")
 
-        # Google Drive Connection
         with st.expander("☁️ Google Drive", expanded=False):
-            # Check if connected
-            is_connected = ('drive_storage' in st.session_state and 
-                          st.session_state.get('drive_storage') is not None and
-                          hasattr(st.session_state['drive_storage'], 'folder_id') and
-                          st.session_state['drive_storage'].folder_id is not None)
-
+            is_connected = ('drive_storage' in st.session_state and st.session_state.get('drive_storage') is not None and hasattr(st.session_state['drive_storage'], 'folder_id') and st.session_state['drive_storage'].folder_id is not None)
             if is_connected:
                 st.success("✅ Connected to Google Drive!")
                 st.info(f"Folder ID: {st.session_state['drive_storage'].folder_id[:20]}...")
             else:
                 st.warning("⚠️ Not connected")
                 st.info("Click below to connect to Google Drive")
-
                 if st.button("🔄 Connect to Drive", key="connect_drive_btn"):
                     try:
                         credentials = dict(st.secrets["gcp_service_account"])
                         drive = GoogleDriveStorage(credentials)
-
                         if not drive.service:
                             st.error("❌ Failed to initialize service!")
                             st.stop()
-
                         folder_id = drive.find_or_create_folder()
-
                         if not folder_id:
                             st.error("❌ Folder 'PrinterServiceCRM' not found!")
                             st.info("1. Create folder in your Google Drive\n2. Share with service account\n3. Try again")
                             st.stop()
-
-                        # Store in session state
                         st.session_state['drive_storage'] = drive
                         st.session_state['crm'] = PrinterServiceCRM(drive)
                         st.success("✅ Connected successfully!")
                         st.rerun()
-
                     except KeyError as e:
                         st.error(f"❌ Missing in secrets: {e}")
                         st.info("Add 'gcp_service_account' in Streamlit Cloud Settings → Secrets")
                     except Exception as e:
                         st.error(f"❌ Connection error: {str(e)}")
 
-    # ========== INITIALIZE CRM (PRESERVE EXISTING CONNECTION) ==========
     if 'crm' not in st.session_state:
-        # Check if we already have connected drive_storage (from button)
         if 'drive_storage' in st.session_state and st.session_state.get('drive_storage'):
-            # Already exists, check if it has folder_id
             if st.session_state['drive_storage'].folder_id:
-                # Good! Has folder_id, reuse it
                 pass
             else:
-                # No folder_id yet, try to find it silently
                 try:
                     st.session_state['drive_storage'].find_or_create_folder()
                 except:
-                    pass  # Silent fail, user can click button
+                    pass
         else:
-            # No drive_storage yet, try to create and connect automatically
             try:
                 credentials = dict(st.secrets["gcp_service_account"])
                 drive = GoogleDriveStorage(credentials)
-                drive.find_or_create_folder()  # Try to connect automatically
+                drive.find_or_create_folder()
                 st.session_state['drive_storage'] = drive
             except:
-                # Auto-connect failed, that's ok - user can click button
                 st.session_state['drive_storage'] = None
-
-        # Create CRM with whatever drive_storage we have
         st.session_state['crm'] = PrinterServiceCRM(st.session_state.get('drive_storage', None))
 
     crm = st.session_state['crm']
-
-    # ========== TABS ==========
     tab1, tab2, tab3, tab4 = st.tabs(["📥 New Order", "📋 All Orders", "✏️ Update Order", "📊 Reports"])
 
     with tab1:
@@ -728,34 +705,23 @@ def main():
                 printer_brand = st.text_input("Brand *")
                 printer_model = st.text_input("Model *")
                 printer_serial = st.text_input("Serial Number")
-
             col3, col4 = st.columns(2)
             with col3:
                 date_received = st.date_input("Date Received *", value=date.today())
             with col4:
                 date_pickup = st.date_input("Scheduled Pickup (optional)", value=None)
-
             issue_description = st.text_area("Issue Description *", height=100)
             accessories = st.text_input("Accessories (cables, cartridges, etc.)")
             notes = st.text_area("Additional Notes", height=60)
-
             submit = st.form_submit_button("🎫 Create Order", type="primary", use_container_width=True)
-
             if submit:
                 if client_name and client_phone and printer_brand and printer_model and issue_description:
-                    order_id = crm.create_service_order(
-                        client_name, client_phone, client_email,
-                        printer_brand, printer_model, printer_serial,
-                        issue_description, accessories, notes,
-                        date_received, date_pickup
-                    )
+                    order_id = crm.create_service_order(client_name, client_phone, client_email, printer_brand, printer_model, printer_serial, issue_description, accessories, notes, date_received, date_pickup)
                     st.session_state['last_created_order'] = order_id
                     st.success(f"✅ Order Created: **{order_id}**")
                     st.balloons()
                 else:
                     st.error("❌ Please fill in all required fields (*)")
-
-        # Show PDF download for last created order
         if st.session_state['last_created_order']:
             order = crm.get_order(st.session_state['last_created_order'])
             if order:
@@ -763,44 +729,23 @@ def main():
                 st.subheader("📄 Download Receipt")
                 logo = st.session_state.get('logo_image', None)
                 pdf_buffer = generate_initial_receipt_pdf(order, st.session_state['company_info'], logo)
-                st.download_button(
-                    "📄 Download Initial Receipt",
-                    pdf_buffer,
-                    f"Initial_{order['order_id']}.pdf",
-                    "application/pdf",
-                    type="secondary",
-                    use_container_width=True,
-                    key="dl_new_init"
-                )
+                st.download_button("📄 Download Initial Receipt", pdf_buffer, f"Initial_{order['order_id']}.pdf", "application/pdf", type="secondary", use_container_width=True, key="dl_new_init")
                 if st.button("✅ Done", use_container_width=True, key="done_new_order"):
                     st.session_state['last_created_order'] = None
                     st.rerun()
+
 
     with tab2:
         st.header("All Service Orders")
         df = crm.list_orders_df()
         if not df.empty:
-            # Metrics
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("📊 Total Orders", len(df))
             col2.metric("📥 Received", len(df[df['status'] == 'Received']))
             col3.metric("✅ Ready", len(df[df['status'] == 'Ready for Pickup']))
             col4.metric("🎉 Completed", len(df[df['status'] == 'Completed']))
-
-            # Orders table
-            st.dataframe(
-                df[['order_id', 'client_name', 'printer_brand', 'date_received', 'status', 'total_cost']],
-                use_container_width=True
-            )
-
-            # CSV Export
-            st.download_button(
-                "📥 Export to CSV",
-                df.to_csv(index=False),
-                f"orders_{datetime.now().strftime('%Y%m%d')}.csv",
-                "text/csv",
-                key="dl_csv"
-            )
+            st.dataframe(df[['order_id', 'client_name', 'printer_brand', 'date_received', 'status', 'total_cost']], use_container_width=True)
+            st.download_button("📥 Export to CSV", df.to_csv(index=False), f"orders_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", key="dl_csv")
         else:
             st.info("📝 No orders yet. Create your first order in the 'New Order' tab!")
 
@@ -809,11 +754,9 @@ def main():
         df = crm.list_orders_df()
         if not df.empty:
             selected_order_id = st.selectbox("Select Order to Update", df['order_id'].tolist())
-
             if selected_order_id:
                 order = crm.get_order(selected_order_id)
                 if order:
-                    # Order info
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write(f"**Client:** {order['client_name']}")
@@ -821,85 +764,44 @@ def main():
                     with col2:
                         st.write(f"**Printer:** {order['printer_brand']} {order['printer_model']}")
                         st.write(f"**Received:** {order['date_received']}")
-
                     st.divider()
-
-                    # Update form
-                    new_status = st.selectbox(
-                        "Status",
-                        ['Received', 'In Progress', 'Ready for Pickup', 'Completed'],
-                        index=['Received', 'In Progress', 'Ready for Pickup', 'Completed'].index(order['status'])
-                    )
-
+                    new_status = st.selectbox("Status", ['Received', 'In Progress', 'Ready for Pickup', 'Completed'], index=['Received', 'In Progress', 'Ready for Pickup', 'Completed'].index(order['status']))
                     if new_status == 'Completed':
                         actual_pickup_date = st.date_input("Actual Pickup Date", value=date.today())
-
                     st.subheader("Repair Details")
                     repair_details = st.text_area("Repairs Performed", value=order.get('repair_details', ''), height=100)
                     parts_used = st.text_input("Parts Used", value=order.get('parts_used', ''))
                     technician = st.text_input("Technician", value=order.get('technician', ''))
-
-                    # Costs
                     col1, col2, col3 = st.columns(3)
                     labor_cost = col1.number_input("Labor Cost (RON)", value=float(order.get('labor_cost', 0)), min_value=0.0, step=10.0)
                     parts_cost = col2.number_input("Parts Cost (RON)", value=float(order.get('parts_cost', 0)), min_value=0.0, step=10.0)
                     col3.metric("💰 Total Cost", f"{labor_cost + parts_cost:.2f} RON")
-
-                    # Update button
                     if st.button("💾 Update Order", type="primary", key="update_order_btn"):
-                        updates = {
-                            'status': new_status,
-                            'repair_details': repair_details,
-                            'parts_used': parts_used,
-                            'technician': technician,
-                            'labor_cost': labor_cost,
-                            'parts_cost': parts_cost
-                        }
+                        updates = {'status': new_status, 'repair_details': repair_details, 'parts_used': parts_used, 'technician': technician, 'labor_cost': labor_cost, 'parts_cost': parts_cost}
                         if new_status == 'Ready for Pickup' and not order.get('date_completed'):
                             updates['date_completed'] = datetime.now().strftime("%Y-%m-%d")
                         if new_status == 'Completed':
                             updates['date_picked_up'] = actual_pickup_date.strftime("%Y-%m-%d")
-
                         if crm.update_order(selected_order_id, **updates):
                             st.success("✅ Order updated successfully!")
                             st.rerun()
-
                     st.divider()
-
-                    # PDF Downloads
                     st.subheader("📄 Download Receipts")
                     st.info("💡 Both PDFs available for download")
-
                     logo = st.session_state.get('logo_image', None)
                     col1, col2 = st.columns(2)
-
                     with col1:
                         st.markdown("**Initial Receipt**")
                         st.caption("Drop-off receipt for client")
                         pdf_init = generate_initial_receipt_pdf(order, st.session_state['company_info'], logo)
-                        st.download_button(
-                            "📄 Download Initial Receipt",
-                            pdf_init,
-                            f"Initial_{order['order_id']}.pdf",
-                            "application/pdf",
-                            use_container_width=True,
-                            key=f"dl_upd_init_{order['order_id']}"
-                        )
-
+                        st.download_button("📄 Download Initial Receipt", pdf_init, f"Initial_{order['order_id']}.pdf", "application/pdf", use_container_width=True, key=f"dl_upd_init_{order['order_id']}")
                     with col2:
                         st.markdown("**Completion Receipt**")
                         st.caption("Pickup/invoice receipt")
                         if order.get('status') not in ['Ready for Pickup', 'Completed'] or float(order.get('total_cost', 0)) == 0:
                             st.warning("⚠️ Complete repair details and costs first")
                         pdf_comp = generate_completion_receipt_pdf(order, st.session_state['company_info'], logo)
-                        st.download_button(
-                            "📄 Download Completion Receipt",
-                            pdf_comp,
-                            f"Completion_{order['order_id']}.pdf",
-                            "application/pdf",
-                            use_container_width=True,
-                            key=f"dl_upd_comp_{order['order_id']}"
-                        )
+                        st.download_button("📄 Download Completion Receipt", pdf_comp, f"Completion_{order['order_id']}.pdf", "application/pdf", use_container_width=True, key=f"dl_upd_comp_{order['order_id']}")
         else:
             st.info("📝 No orders yet. Create your first order in the 'New Order' tab!")
 
@@ -907,19 +809,14 @@ def main():
         st.header("Reports & Analytics")
         df = crm.list_orders_df()
         if not df.empty:
-            # Metrics
             col1, col2, col3 = st.columns(3)
             col1.metric("💰 Total Revenue", f"{df['total_cost'].sum():.2f} RON")
             avg_cost = df[df['total_cost'] > 0]['total_cost'].mean() if len(df[df['total_cost'] > 0]) > 0 else 0
             col2.metric("📊 Average Cost", f"{avg_cost:.2f} RON")
             col3.metric("👥 Unique Clients", df['client_name'].nunique())
-
             st.divider()
-
-            # Charts
             st.subheader("Orders by Status")
             st.bar_chart(df['status'].value_counts())
-
         else:
             st.info("📝 No data yet. Create orders to see reports!")
 
