@@ -749,12 +749,10 @@ def main():
                 "📝 No orders yet. Create your first order in the 'New Order' tab!"
             )
 
-    # TAB 3: UPDATE ORDER
     with tab3:
         st.header("Update Service Order")
         df = crm.list_orders_df()
         if not df.empty:
-            # selectăm comanda, dar FĂRĂ să forțăm index care poate da eroare
             selected_order_id = st.selectbox(
                 "Select Order to Update",
                 df["order_id"].tolist(),
@@ -764,20 +762,30 @@ def main():
             if selected_order_id:
                 order = crm.get_order(selected_order_id)
                 if order:
-                    # --------- info de sus ----------
+                    # ----- Info de sus -----
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
                         st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
                     with col2:
                         st.write(
-                            f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}"
+                            f"**Printer:** {safe_text(order.get('printer_brand'))} "
+                            f"{safe_text(order.get('printer_model'))}"
                         )
                         st.write(f"**Received:** {safe_text(order.get('date_received'))}")
     
                     st.divider()
     
-                    # --------- status & dates ----------
+                    # ----- Detalii existente, doar de citit -----
+                    with st.expander("🔎 Existing order details", expanded=False):
+                        st.write("**Issue reported:**")
+                        st.write(safe_text(order.get("issue_description")))
+                        st.write("**Accessories:**")
+                        st.write(safe_text(order.get("accessories")))
+                        st.write("**Internal notes:**")
+                        st.write(safe_text(order.get("notes")))
+    
+                    # ----- Status -----
                     status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
                     current_status = safe_text(order.get("status")) or "Received"
                     if current_status not in status_options:
@@ -800,53 +808,72 @@ def main():
                     else:
                         actual_pickup_date = None
     
-                    # --------- text fields (fără 'nan') ----------
-                    st.subheader("Repair Details")
+                    # ----- Câmpuri EDITABILE cu VALOAREA VECHE -----
+                    st.subheader("Repair details (editable)")
+    
                     repair_details = st.text_area(
-                        "Repairs Performed",
+                        "Repairs performed",
                         value=safe_text(order.get("repair_details")),
                         height=100,
                         key="update_repair_details",
                     )
+    
                     parts_used = st.text_input(
-                        "Parts Used",
+                        "Parts used",
                         value=safe_text(order.get("parts_used")),
                         key="update_parts_used",
                     )
+    
                     technician = st.text_input(
                         "Technician",
                         value=safe_text(order.get("technician")),
                         key="update_technician",
                     )
     
-                    # --------- costs ----------
+                    accessories = st.text_input(
+                        "Accessories (editable)",
+                        value=safe_text(order.get("accessories")),
+                        key="update_accessories",
+                    )
+    
+                    notes = st.text_area(
+                        "Internal notes (editable)",
+                        value=safe_text(order.get("notes")),
+                        height=80,
+                        key="update_notes",
+                    )
+    
+                    # ----- Costuri -----
                     colc1, colc2, colc3 = st.columns(3)
                     labor_cost = colc1.number_input(
-                        "Labor Cost (RON)",
-                        value=safe_float(order.get("labor_cost")),
+                        "Labor cost (RON)",
+                        value=float(order.get("labor_cost") or 0),
                         min_value=0.0,
                         step=10.0,
                         key="update_labor_cost",
                     )
                     parts_cost = colc2.number_input(
-                        "Parts Cost (RON)",
-                        value=safe_float(order.get("parts_cost")),
+                        "Parts cost (RON)",
+                        value=float(order.get("parts_cost") or 0),
                         min_value=0.0,
                         step=10.0,
                         key="update_parts_cost",
                     )
-                    colc3.metric("💰 Total Cost", f"{labor_cost + parts_cost:.2f} RON")
+                    colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
     
-                    # --------- buton update ----------
+                    # ----- Buton UPDATE -----
                     if st.button("💾 Update Order", type="primary", key="update_order_btn"):
                         updates = {
                             "status": new_status,
                             "repair_details": repair_details,
                             "parts_used": parts_used,
                             "technician": technician,
+                            "accessories": accessories,
+                            "notes": notes,
                             "labor_cost": labor_cost,
                             "parts_cost": parts_cost,
                         }
+    
                         if new_status == "Ready for Pickup" and not order.get("date_completed"):
                             updates["date_completed"] = datetime.now().strftime("%Y-%m-%d")
                         if new_status == "Completed":
@@ -858,45 +885,10 @@ def main():
     
                         if crm.update_order(selected_order_id, **updates):
                             st.success("✅ Order updated successfully!")
-    
-                            # opțional, poți reselecta nimic
-                            # st.session_state["update_order_select"] = ""
-    
                             st.rerun()
-    
-                    # --------- PDF-uri ----------
-                    st.divider()
-                    st.subheader("📄 Download Receipts")
-                    logo = st.session_state.get("logo_image", None)
-                    colp1, colp2 = st.columns(2)
-                    with colp1:
-                        st.markdown("**Initial Receipt**")
-                        pdf_init = generate_initial_receipt_pdf(
-                            order, st.session_state["company_info"], logo
-                        )
-                        st.download_button(
-                            "📄 Download Initial Receipt",
-                            pdf_init,
-                            f"Initial_{order['order_id']}.pdf",
-                            "application/pdf",
-                            use_container_width=True,
-                            key=f"dl_upd_init_{order['order_id']}",
-                        )
-                    with colp2:
-                        st.markdown("**Completion Receipt**")
-                        pdf_comp = generate_completion_receipt_pdf(
-                            order, st.session_state["company_info"], logo
-                        )
-                        st.download_button(
-                            "📄 Download Completion Receipt",
-                            pdf_comp,
-                            f"Completion_{order['order_id']}.pdf",
-                            "application/pdf",
-                            use_container_width=True,
-                            key=f"dl_upd_comp_{order['order_id']}",
-                        )
         else:
             st.info("📝 No orders yet. Create your first order in the 'New Order' tab!")
+    
 
 
     # TAB 4: REPORTS
