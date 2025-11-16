@@ -661,13 +661,13 @@ def main():
                     with col1:
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
                         st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
-                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
-                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
-                    with col2:
+                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
                         st.write(f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
+                    with col2:
+                        st.write(f"**Printer:** {safe_text(order.get('printer_model'))} {safe_text(order.get('printer_model'))}")
+                        st.write(f"**Printer:** {safe_text(order.get('printer_serial'))} {safe_text(order.get('printer_serial'))}")
                         st.write(f"**Received:** {safe_text(order.get('date_received'))}")
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
-                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
 
                     st.divider()
 
