@@ -22,6 +22,10 @@ st.set_page_config(
     page_icon="🖨️",
     layout="wide",
 )
+@st.cache_data(ttl=60)
+def _cached_read_sheet(conn, worksheet_name: str):
+    """Citește foaia din Google Sheets cu cache 60s ca să nu depășim cota."""
+    return conn.read(worksheet=worksheet_name)
 
 
 # -------------------------------------------------------------------
@@ -360,11 +364,11 @@ class PrinterServiceCRM:
 
     def _read_df(self, raw: bool = False) -> pd.DataFrame | None:
         """
-        Citește toată foaia.
-        Dacă apare o eroare, afișează mesaj și NU întoarce DataFrame gol în liniște.
+        Citește toată foaia prin cache (max 1 citire / 60s).
+        Dacă apare o eroare, nu întoarce DataFrame gol în liniște.
         """
         try:
-            df = self.conn.read(worksheet=self.worksheet, ttl=0)
+            df = _cached_read_sheet(self.conn, self.worksheet)
             if df is None:
                 return None
             if raw:
@@ -654,6 +658,11 @@ def main():
                         st.session_state["last_created_order"] = order_id
                         st.success(f"✅ Order Created: **{order_id}**")
                         st.balloons()
+                            crm = st.session_state["crm"]
+
+    # Citește o singură dată toate comenzile
+    df_all = crm.list_orders_df()
+
                 else:
                     st.error("❌ Please fill in all required fields (*)")
 
