@@ -20,14 +20,9 @@ from PIL import Image
 st.set_page_config(
     page_title="Printer Service CRM",
     page_icon="🖨️",
-    layout="wide"
+    layout="wide",
 )
-st.sidebar.write("🔍 DEBUG GSHEETS")
-try:
-    st.sidebar.write("Spreadsheet URL:", st.secrets["connections"]["gsheets"]["spreadsheet"])
-    st.sidebar.write("Service account:", st.secrets["connections"]["gsheets"]["client_email"])
-except Exception as e:
-    st.sidebar.write("Secrets error:", e)
+
 
 # -------------------------------------------------------------------
 # AUTH
@@ -43,17 +38,22 @@ def check_password() -> bool:
     if st.session_state["authenticated"]:
         return True
 
-    st.markdown("## 🔒 Autentificare necesară")
+    st.markdown("## 🔒 Login Required")
+    st.markdown("Please enter your credentials to access the CRM system.")
+
     with st.form("login_form"):
         username = st.text_input("Username")
-        password = st.text_input("Parolă", type="password")
+        password = st.text_input("Password", type="password")
         submit = st.form_submit_button("Login")
 
         if submit:
             try:
                 correct_password = st.secrets["passwords"]["admin_password"]
             except KeyError:
-                st.error("❌ Nu ai setat `passwords.admin_password` în Secrets.")
+                st.error("❌ Password not configured in secrets!")
+                st.info(
+                    "Add 'passwords.admin_password' in Streamlit Cloud Settings → Secrets"
+                )
                 return False
 
             if username == "admin" and hash_password(password) == hash_password(
@@ -61,10 +61,11 @@ def check_password() -> bool:
             ):
                 st.session_state["authenticated"] = True
                 st.session_state["username"] = username
-                st.success("✅ Login reușit!")
+                st.success("✅ Login successful!")
                 st.rerun()
             else:
-                st.error("❌ Username sau parolă greșite.")
+                st.error("❌ Invalid username or password")
+
     return False
 
 
@@ -74,7 +75,7 @@ def check_password() -> bool:
 def remove_diacritics(text):
     if not isinstance(text, str):
         return text
-    mapping = {
+    diacritics_map = {
         "ă": "a",
         "Ă": "A",
         "â": "a",
@@ -86,7 +87,7 @@ def remove_diacritics(text):
         "ț": "t",
         "Ț": "T",
     }
-    for d, r in mapping.items():
+    for d, r in diacritics_map.items():
         text = text.replace(d, r)
     return text
 
@@ -97,9 +98,9 @@ def remove_diacritics(text):
 @st.cache_resource
 def get_sheets_connection():
     """
-    Conexiune nativă Streamlit către Google Sheets.
+    Native Streamlit connection to Google Sheets using streamlit-gsheets.
 
-    Necesită în `secrets.toml`:
+    Requires in secrets:
 
     [connections.gsheets]
     spreadsheet = "https://docs.google.com/spreadsheets/d/ID/edit"
@@ -118,7 +119,7 @@ def get_sheets_connection():
         conn = st.connection("gsheets", type=GSheetsConnection)
         return conn
     except Exception as e:
-        st.error(f"Eroare conexiune Google Sheets: {e}")
+        st.error(f"Google Sheets connection failed: {e}")
         return None
 
 
@@ -130,7 +131,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     width, height = 210 * mm, 148.5 * mm
     c = canvas.Canvas(buffer, pagesize=(width, height))
 
-    # LOGO
+    # Logo
     if logo_image:
         try:
             logo = Image.open(logo_image)
@@ -160,7 +161,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
         c.setFont("Helvetica-Bold", 10)
         c.drawString(15 * mm, height - 20 * mm, "[LOGO]")
 
-    # COMPANY INFO
+    # Company info
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
     c.drawString(
@@ -173,10 +174,22 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(
         10 * mm, y_pos, remove_diacritics(company_info.get("company_address", ""))
     )
+    y_pos -= 3.5 * mm
+    c.drawString(
+        10 * mm,
+        y_pos,
+        f"CUI: {company_info.get('cui','')} | Reg.Com: {company_info.get('reg_com','')}",
+    )
+    y_pos -= 3.5 * mm
+    c.drawString(
+        10 * mm,
+        y_pos,
+        f"Tel: {company_info.get('phone','')} | {company_info.get('email','')}",
+    )
 
-    # TITLU
+    # Title
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(105 * mm, height - 55 * mm, "BON PREDARE ECHIPAMENT")
+    c.drawCentredString(105 * mm, height - 55 * mm, "BON PREDARE ECHIPAMENT IN SERVICE")
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(colors.HexColor("#0066cc"))
     c.drawCentredString(
@@ -184,20 +197,77 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     )
     c.setFillColor(colors.black)
 
-    # DETALII
+    # Details
     y_pos = height - 72 * mm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(10 * mm, y_pos, "DETALII ECHIPAMENT:")
+    y_pos -= 5 * mm
     c.setFont("Helvetica", 8)
-    c.drawString(10 * mm, y_pos, f"Client: {remove_diacritics(order['client_name'])}")
-    y_pos -= 4 * mm
-    c.drawString(10 * mm, y_pos, f"Telefon: {order['client_phone']}")
-    y_pos -= 4 * mm
     c.drawString(
         10 * mm,
         y_pos,
         f"Imprimantă: {remove_diacritics(order['printer_brand'])} {remove_diacritics(order['printer_model'])}",
     )
     y_pos -= 4 * mm
+    c.drawString(10 * mm, y_pos, f"Serie: {order.get('printer_serial','N/A')}")
+    y_pos -= 4 * mm
     c.drawString(10 * mm, y_pos, f"Data predării: {order['date_received']}")
+
+    if order.get("accessories"):
+        y_pos -= 4 * mm
+        c.drawString(
+            10 * mm,
+            y_pos,
+            f"Accesorii: {remove_diacritics(order['accessories'])}",
+        )
+
+    y_pos -= 6 * mm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(10 * mm, y_pos, "PROBLEMĂ RAPORTATĂ:")
+    y_pos -= 4 * mm
+    c.setFont("Helvetica", 8)
+    issue_text = remove_diacritics(order["issue_description"])
+    text_object = c.beginText(10 * mm, y_pos)
+    text_object.setFont("Helvetica", 8)
+    words = issue_text.split()
+    line = ""
+    for word in words:
+        test_line = line + word + " "
+        if c.stringWidth(test_line, "Helvetica", 8) < 190 * mm:
+            line = test_line
+        else:
+            text_object.textLine(line)
+            line = word + " "
+    text_object.textLine(line)
+    c.drawText(text_object)
+
+    # Signatures
+    y_pos = 25 * mm
+    c.rect(10 * mm, y_pos, 85 * mm, 20 * mm)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(12 * mm, y_pos + 17 * mm, "OPERATOR SERVICE")
+    c.setFont("Helvetica", 7)
+    c.drawString(12 * mm, y_pos + 2 * mm, "Semnătură și ștampilă")
+
+    c.rect(115 * mm, y_pos, 85 * mm, 20 * mm)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(117 * mm, y_pos + 17 * mm, "CLIENT")
+    c.setFont("Helvetica", 7)
+    c.drawString(
+        117 * mm,
+        y_pos + 13 * mm,
+        f"Nume: {remove_diacritics(order['client_name'])}",
+    )
+    c.drawString(117 * mm, y_pos + 2 * mm, "Semnătură")
+
+    c.setFont("Helvetica", 6)
+    c.drawCentredString(
+        105 * mm,
+        3 * mm,
+        "Acest document constituie dovada predării echipamentului în service.",
+    )
+    c.setDash(3, 3)
+    c.line(5 * mm, 1 * mm, 205 * mm, 1 * mm)
 
     c.save()
     buffer.seek(0)
@@ -217,11 +287,12 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
         105 * mm, height - 38 * mm, f"Nr. Comandă: {order['order_id']}"
     )
     c.setFillColor(colors.black)
+
     c.setFont("Helvetica", 8)
     c.drawString(
         10 * mm,
         height - 50 * mm,
-        f"Total: {float(order.get('total_cost', 0)):.2f} RON",
+        f"Total: {float(order.get('total_cost',0)):.2f} RON",
     )
 
     c.save()
@@ -230,7 +301,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
 
 
 # -------------------------------------------------------------------
-# CRM CLASS (GOOGLE SHEETS)
+# CRM CLASS - GOOGLE SHEETS
 # -------------------------------------------------------------------
 class PrinterServiceCRM:
     def __init__(self, conn: GSheetsConnection):
@@ -239,8 +310,10 @@ class PrinterServiceCRM:
         self.next_order_id = 1
         self._init_sheet()
 
+    # ---------- internal helpers ----------
+
     def _init_sheet(self):
-        """Asigură existența headerelor și calculează next_order_id."""
+        """Ensure headers exist and compute next_order_id."""
         try:
             df = self.conn.read(worksheet=self.worksheet, ttl=0)
         except Exception:
@@ -297,10 +370,13 @@ class PrinterServiceCRM:
     def _write_df(self, df: pd.DataFrame) -> bool:
         try:
             self.conn.update(worksheet=self.worksheet, data=df)
+            st.sidebar.success("💾 Saved to Google Sheets!")
             return True
         except Exception as e:
-            st.sidebar.error(f"Eroare salvare în Sheets: {e}")
+            st.sidebar.error(f"Error saving to Google Sheets: {e}")
             return False
+
+    # ---------- CRUD ----------
 
     def create_service_order(
         self,
@@ -318,45 +394,51 @@ class PrinterServiceCRM:
     ):
         order_id = f"SRV-{self.next_order_id:05d}"
 
-        new_row = {
-            "order_id": order_id,
-            "client_name": client_name,
-            "client_phone": client_phone,
-            "client_email": client_email,
-            "printer_brand": printer_brand,
-            "printer_model": printer_model,
-            "printer_serial": printer_serial,
-            "issue_description": issue_description,
-            "accessories": accessories,
-            "notes": notes,
-            "date_received": date_received.strftime("%Y-%m-%d")
-            if date_received
-            else "",
-            "date_pickup_scheduled": date_pickup.strftime("%Y-%m-%d")
-            if date_pickup
-            else "",
-            "date_completed": "",
-            "date_picked_up": "",
-            "status": "Received",
-            "technician": "",
-            "repair_details": "",
-            "parts_used": "",
-            "labor_cost": 0.0,
-            "parts_cost": 0.0,
-            "total_cost": 0.0,
-        }
+        new_order = pd.DataFrame(
+            [
+                {
+                    "order_id": order_id,
+                    "client_name": client_name,
+                    "client_phone": client_phone,
+                    "client_email": client_email,
+                    "printer_brand": printer_brand,
+                    "printer_model": printer_model,
+                    "printer_serial": printer_serial,
+                    "issue_description": issue_description,
+                    "accessories": accessories,
+                    "notes": notes,
+                    "date_received": date_received.strftime("%Y-%m-%d")
+                    if date_received
+                    else datetime.now().strftime("%Y-%m-%d"),
+                    "date_pickup_scheduled": date_pickup.strftime("%Y-%m-%d")
+                    if date_pickup
+                    else "",
+                    "date_completed": "",
+                    "date_picked_up": "",
+                    "status": "Received",
+                    "technician": "",
+                    "repair_details": "",
+                    "parts_used": "",
+                    "labor_cost": 0.0,
+                    "parts_cost": 0.0,
+                    "total_cost": 0.0,
+                }
+            ]
+        )
 
         df = self._read_df()
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        if df.empty:
+            updated_df = new_order
+        else:
+            updated_df = pd.concat([df, new_order], ignore_index=True)
 
-        if self._write_df(df):
+        if self._write_df(updated_df):
             self.next_order_id += 1
             return order_id
         return None
 
     def list_orders_df(self) -> pd.DataFrame:
         df = self._read_df()
-        # conversie numerică
         for col in ["labor_cost", "parts_cost", "total_cost"]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
@@ -364,32 +446,39 @@ class PrinterServiceCRM:
 
     def get_order(self, order_id: str):
         df = self._read_df()
-        if df.empty:
+        if df.empty or "order_id" not in df.columns:
             return None
         row = df[df["order_id"] == order_id]
         if row.empty:
             return None
-        rec = row.iloc[0].to_dict()
-        return rec
+        return row.iloc[0].to_dict()
 
     def update_order(self, order_id: str, **kwargs) -> bool:
+        """
+        IMPORTANT:
+        - Read entire sheet
+        - Modify only the matching row
+        - Write back the ENTIRE DataFrame
+        So no rows are deleted.
+        """
         df = self._read_df()
-        if df.empty:
+        if df.empty or "order_id" not in df.columns:
             return False
+
         mask = df["order_id"] == order_id
         if not mask.any():
             return False
 
-        for key, val in kwargs.items():
+        # Apply updates
+        for key, value in kwargs.items():
             if key in df.columns:
-                df.loc[mask, key] = val
+                df.loc[mask, key] = value
 
-        # recalcul total
+        # Recalculate total if needed
         if "labor_cost" in df.columns and "parts_cost" in df.columns:
-            df.loc[mask, "total_cost"] = (
-                pd.to_numeric(df.loc[mask, "labor_cost"], errors="coerce").fillna(0)
-                + pd.to_numeric(df.loc[mask, "parts_cost"], errors="coerce").fillna(0)
-            )
+            labor = pd.to_numeric(df.loc[mask, "labor_cost"], errors="coerce").fillna(0)
+            parts = pd.to_numeric(df.loc[mask, "parts_cost"], errors="coerce").fillna(0)
+            df.loc[mask, "total_cost"] = labor + parts
 
         return self._write_df(df)
 
@@ -402,8 +491,9 @@ def main():
         st.stop()
 
     st.title("🖨️ Printer Service CRM")
+    st.markdown("### Professional Printer Service Management System")
 
-    # SESSION STATE DEFAULTS
+    # Session defaults
     if "company_info" not in st.session_state:
         st.session_state["company_info"] = {
             "company_name": "Print Service Pro SRL",
@@ -418,46 +508,60 @@ def main():
     if "logo_image" not in st.session_state:
         st.session_state["logo_image"] = None
 
-    # SIDEBAR
+    # Sidebar
     with st.sidebar:
-        st.header("⚙️ Setări")
+        st.header("⚙️ Configuration")
         st.success(f"👤 {st.session_state.get('username', 'User')}")
-        if st.button("🚪 Logout"):
+
+        if st.button("🚪 Logout", key="logout_btn"):
             st.session_state["authenticated"] = False
             st.rerun()
+
         st.divider()
 
-        with st.expander("🖼️ Logo", expanded=False):
-            logo_file = st.file_uploader(
-                "Încarcă logo", type=["png", "jpg", "jpeg"], key="logo_uploader"
+        # Logo
+        with st.expander("🖼️ Company Logo", expanded=False):
+            uploaded_logo = st.file_uploader(
+                "Upload logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="logo_uploader"
             )
-            if logo_file:
-                st.session_state["logo_image"] = logo_file
-                st.image(logo_file, width=150)
+            if uploaded_logo:
+                st.session_state["logo_image"] = uploaded_logo
+                st.success("✅ Logo uploaded!")
+                st.image(uploaded_logo, width=150)
+            elif st.session_state["logo_image"]:
+                st.image(st.session_state["logo_image"], width=150)
 
-        with st.expander("🏢 Date firmă", expanded=False):
+        # Company details
+        with st.expander("🏢 Company Details", expanded=False):
             ci = st.session_state["company_info"]
             ci["company_name"] = st.text_input(
-                "Denumire firmă", value=ci["company_name"]
+                "Company Name", value=ci["company_name"], key="company_name_input"
             )
             ci["company_address"] = st.text_input(
-                "Adresă", value=ci["company_address"]
+                "Address", value=ci["company_address"], key="company_address_input"
             )
-            ci["cui"] = st.text_input("CUI", value=ci["cui"])
-            ci["reg_com"] = st.text_input("Reg. Com.", value=ci["reg_com"])
-            ci["phone"] = st.text_input("Telefon", value=ci["phone"])
-            ci["email"] = st.text_input("Email", value=ci["email"])
+            ci["cui"] = st.text_input("CUI", value=ci["cui"], key="company_cui_input")
+            ci["reg_com"] = st.text_input(
+                "Reg.Com", value=ci["reg_com"], key="company_regcom_input"
+            )
+            ci["phone"] = st.text_input(
+                "Phone", value=ci["phone"], key="company_phone_input"
+            )
+            ci["email"] = st.text_input(
+                "Email", value=ci["email"], key="company_email_input"
+            )
 
-        # connection status
+        # Sheets status
         conn = get_sheets_connection()
-        if conn:
-            st.success("✅ Connected to Google Sheets")
-        else:
-            st.error("❌ Nu mă pot conecta la Google Sheets")
+        with st.expander("📊 Google Sheets", expanded=False):
+            if conn:
+                st.success("✅ Connected to Google Sheets!")
+            else:
+                st.error("❌ Not connected to Google Sheets")
 
     conn = get_sheets_connection()
     if not conn:
-        st.error("Fără conexiune la Google Sheets, app-ul nu poate funcționa.")
+        st.error("Cannot connect to Google Sheets. Check secrets configuration.")
         st.stop()
 
     if "crm" not in st.session_state:
@@ -466,37 +570,40 @@ def main():
     crm = st.session_state["crm"]
 
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["📥 Comandă nouă", "📋 Toate comenzi", "✏️ Update comandă", "📊 Rapoarte"]
+        ["📥 New Order", "📋 All Orders", "✏️ Update Order", "📊 Reports"]
     )
 
-    # TAB 1 - NEW ORDER
+    # TAB 1: NEW ORDER
     with tab1:
-        st.header("Creează comandă nouă")
-
-        with st.form("new_order_form", clear_on_submit=True):
+        st.header("Create New Service Order")
+        with st.form(key="new_order_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                client_name = st.text_input("Nume client *")
-                client_phone = st.text_input("Telefon *")
+                st.subheader("Client Information")
+                client_name = st.text_input("Name *")
+                client_phone = st.text_input("Phone *")
                 client_email = st.text_input("Email")
             with col2:
-                printer_brand = st.text_input("Brand imprimantă *")
+                st.subheader("Printer Information")
+                printer_brand = st.text_input("Brand *")
                 printer_model = st.text_input("Model *")
-                printer_serial = st.text_input("Serie")
+                printer_serial = st.text_input("Serial Number")
 
             col3, col4 = st.columns(2)
             with col3:
-                date_received = st.date_input("Data primirii *", value=date.today())
+                date_received = st.date_input("Date Received *", value=date.today())
             with col4:
                 date_pickup = st.date_input(
-                    "Data estimată ridicare (opțional)", value=None
+                    "Scheduled Pickup (optional)", value=None
                 )
 
-            issue_description = st.text_area("Descriere problemă *")
-            accessories = st.text_input("Accesorii (cablu, toner, etc.)")
-            notes = st.text_area("Note interne")
+            issue_description = st.text_area("Issue Description *", height=100)
+            accessories = st.text_input("Accessories (cables, cartridges, etc.)")
+            notes = st.text_area("Additional Notes", height=60)
 
-            submit = st.form_submit_button("✅ Creează comandă")
+            submit = st.form_submit_button(
+                "🎫 Create Order", type="primary", use_container_width=True
+            )
 
             if submit:
                 if (
@@ -521,36 +628,48 @@ def main():
                     )
                     if order_id:
                         st.session_state["last_created_order"] = order_id
-                        st.success(f"Comanda {order_id} a fost creată.")
+                        st.success(f"✅ Order Created: **{order_id}**")
                         st.balloons()
                 else:
-                    st.error("Te rog completează toate câmpurile marcate cu *.")
+                    st.error("❌ Please fill in all required fields (*)")
 
         if st.session_state["last_created_order"]:
             order = crm.get_order(st.session_state["last_created_order"])
             if order:
-                st.subheader("📄 Bon predare")
-                pdf_buf = generate_initial_receipt_pdf(
-                    order,
-                    st.session_state["company_info"],
-                    st.session_state["logo_image"],
+                st.divider()
+                st.subheader("📄 Download Receipt")
+                logo = st.session_state.get("logo_image", None)
+                pdf_buffer = generate_initial_receipt_pdf(
+                    order, st.session_state["company_info"], logo
                 )
                 st.download_button(
-                    "📄 Descarcă bon predare",
-                    data=pdf_buf,
-                    file_name=f"bon_predare_{order['order_id']}.pdf",
-                    mime="application/pdf",
+                    "📄 Download Initial Receipt",
+                    pdf_buffer,
+                    f"Initial_{order['order_id']}.pdf",
+                    "application/pdf",
+                    type="secondary",
+                    use_container_width=True,
+                    key="dl_new_init",
                 )
 
-    # TAB 2 - ALL ORDERS
+                if st.button(
+                    "✅ Done", use_container_width=True, key="done_new_order"
+                ):
+                    st.session_state["last_created_order"] = None
+                    st.rerun()
+
+    # TAB 2: ALL ORDERS
     with tab2:
-        st.header("Toate comenzile")
+        st.header("All Service Orders")
         df = crm.list_orders_df()
         if not df.empty:
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Total comenzi", len(df))
-            col2.metric("În lucru / primite", len(df[df["status"] != "Completed"]))
-            col3.metric("Finalizate", len(df[df["status"] == "Completed"]))
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("📊 Total Orders", len(df))
+            col2.metric("📥 Received", len(df[df["status"] == "Received"]))
+            col3.metric(
+                "✅ Ready", len(df[df["status"] == "Ready for Pickup"])
+            )
+            col4.metric("🎉 Completed", len(df[df["status"] == "Completed"]))
 
             st.dataframe(
                 df[
@@ -558,7 +677,7 @@ def main():
                         "order_id",
                         "client_name",
                         "printer_brand",
-                        "printer_model",
+                        "date_received",
                         "status",
                         "total_cost",
                     ]
@@ -566,38 +685,43 @@ def main():
                 use_container_width=True,
             )
 
-            # backup download
-            csv_data = df.to_csv(index=False)
+            csv = df.to_csv(index=False)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             st.download_button(
-                "💾 Descarcă backup (CSV)",
-                data=csv_data,
-                file_name=f"crm_backup_{ts}.csv",
-                mime="text/csv",
+                "📥 Export to CSV",
+                csv,
+                f"orders_{ts}.csv",
+                "text/csv",
+                key="dl_csv",
                 use_container_width=True,
             )
         else:
-            st.info("Nu există comenzi încă.")
+            st.info(
+                "📝 No orders yet. Create your first order in the 'New Order' tab!"
+            )
 
-    # TAB 3 - UPDATE ORDER
+    # TAB 3: UPDATE ORDER
     with tab3:
-        st.header("Update comandă")
+        st.header("Update Service Order")
         df = crm.list_orders_df()
         if not df.empty:
-            order_id = st.selectbox("Alege comandă", df["order_id"].tolist())
-            if order_id:
-                order = crm.get_order(order_id)
+            selected_order_id = st.selectbox(
+                "Select Order to Update", df["order_id"].tolist()
+            )
+            if selected_order_id:
+                order = crm.get_order(selected_order_id)
                 if order:
-                    st.subheader(f"Comanda {order_id}")
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.write(f"Client: **{order['client_name']}**")
-                        st.write(
-                            f"Imprimantă: {order['printer_brand']} {order['printer_model']}"
-                        )
+                        st.write(f"**Client:** {order['client_name']}")
+                        st.write(f"**Phone:** {order['client_phone']}")
                     with col2:
-                        st.write(f"Stare actuală: {order['status']}")
-                        st.write(f"Primire: {order['date_received']}")
+                        st.write(
+                            f"**Printer:** {order['printer_brand']} {order['printer_model']}"
+                        )
+                        st.write(f"**Received:** {order['date_received']}")
+
+                    st.divider()
 
                     new_status = st.selectbox(
                         "Status",
@@ -607,111 +731,140 @@ def main():
                             "In Progress",
                             "Ready for Pickup",
                             "Completed",
-                        ].index(order["status"]
-                                if order["status"] in
-                                ["Received", "In Progress", "Ready for Pickup", "Completed"]
-                                else "Received"),
+                        ].index(
+                            order["status"]
+                            if order["status"]
+                            in [
+                                "Received",
+                                "In Progress",
+                                "Ready for Pickup",
+                                "Completed",
+                            ]
+                            else "Received"
+                        ),
                     )
-                    technician = st.text_input(
-                        "Tehnician", value=order.get("technician", "")
-                    )
+
+                    if new_status == "Completed":
+                        actual_pickup_date = st.date_input(
+                            "Actual Pickup Date", value=date.today()
+                        )
+                    else:
+                        actual_pickup_date = None
+
+                    st.subheader("Repair Details")
                     repair_details = st.text_area(
-                        "Detalii reparație",
+                        "Repairs Performed",
                         value=order.get("repair_details", ""),
-                        height=80,
+                        height=100,
                     )
                     parts_used = st.text_input(
-                        "Piese folosite", value=order.get("parts_used", "")
+                        "Parts Used", value=order.get("parts_used", "")
+                    )
+                    technician = st.text_input(
+                        "Technician", value=order.get("technician", "")
                     )
 
                     colc1, colc2, colc3 = st.columns(3)
-                    with colc1:
-                        labor_cost = st.number_input(
-                            "Manoperă (RON)",
-                            value=float(order.get("labor_cost", 0) or 0),
-                            min_value=0.0,
-                            step=10.0,
-                        )
-                    with colc2:
-                        parts_cost = st.number_input(
-                            "Cost piese (RON)",
-                            value=float(order.get("parts_cost", 0) or 0),
-                            min_value=0.0,
-                            step=10.0,
-                        )
-                    with colc3:
-                        total_preview = labor_cost + parts_cost
-                        st.metric("Total", f"{total_preview:.2f} RON")
+                    labor_cost = colc1.number_input(
+                        "Labor Cost (RON)",
+                        value=float(order.get("labor_cost", 0) or 0),
+                        min_value=0.0,
+                        step=10.0,
+                    )
+                    parts_cost = colc2.number_input(
+                        "Parts Cost (RON)",
+                        value=float(order.get("parts_cost", 0) or 0),
+                        min_value=0.0,
+                        step=10.0,
+                    )
+                    colc3.metric(
+                        "💰 Total Cost", f"{labor_cost + parts_cost:.2f} RON"
+                    )
 
-                    if st.button("💾 Salvează modificările"):
+                    if st.button(
+                        "💾 Update Order", type="primary", key="update_order_btn"
+                    ):
                         updates = {
                             "status": new_status,
-                            "technician": technician,
                             "repair_details": repair_details,
                             "parts_used": parts_used,
+                            "technician": technician,
                             "labor_cost": labor_cost,
                             "parts_cost": parts_cost,
                         }
-                        if new_status == "Ready for Pickup" and not order.get(
-                            "date_completed"
+                        if (
+                            new_status == "Ready for Pickup"
+                            and not order.get("date_completed")
                         ):
                             updates["date_completed"] = datetime.now().strftime(
                                 "%Y-%m-%d"
                             )
-                        if new_status == "Completed" and not order.get(
-                            "date_picked_up"
-                        ):
-                            updates["date_picked_up"] = datetime.now().strftime(
-                                "%Y-%m-%d"
+                        if new_status == "Completed":
+                            updates["date_picked_up"] = (
+                                actual_pickup_date.strftime("%Y-%m-%d")
+                                if actual_pickup_date
+                                else datetime.now().strftime("%Y-%m-%d")
                             )
 
-                        if crm.update_order(order_id, **updates):
-                            st.success("Comanda a fost actualizată.")
+                        if crm.update_order(selected_order_id, **updates):
+                            st.success("✅ Order updated successfully!")
                             st.rerun()
 
-                    st.subheader("📄 PDF-uri")
+                    st.divider()
+                    st.subheader("📄 Download Receipts")
+                    logo = st.session_state.get("logo_image", None)
                     colp1, colp2 = st.columns(2)
                     with colp1:
-                        init_pdf = generate_initial_receipt_pdf(
-                            order,
-                            st.session_state["company_info"],
-                            st.session_state["logo_image"],
+                        st.markdown("**Initial Receipt**")
+                        pdf_init = generate_initial_receipt_pdf(
+                            order, st.session_state["company_info"], logo
                         )
                         st.download_button(
-                            "📄 Bon predare",
-                            data=init_pdf,
-                            file_name=f"bon_predare_{order_id}.pdf",
-                            mime="application/pdf",
+                            "📄 Download Initial Receipt",
+                            pdf_init,
+                            f"Initial_{order['order_id']}.pdf",
+                            "application/pdf",
+                            use_container_width=True,
+                            key=f"dl_upd_init_{order['order_id']}",
                         )
                     with colp2:
-                        compl_pdf = generate_completion_receipt_pdf(
-                            order,
-                            st.session_state["company_info"],
-                            st.session_state["logo_image"],
+                        st.markdown("**Completion Receipt**")
+                        pdf_comp = generate_completion_receipt_pdf(
+                            order, st.session_state["company_info"], logo
                         )
                         st.download_button(
-                            "📄 Bon finalizare",
-                            data=compl_pdf,
-                            file_name=f"bon_final_{order_id}.pdf",
-                            mime="application/pdf",
+                            "📄 Download Completion Receipt",
+                            pdf_comp,
+                            f"Completion_{order['order_id']}.pdf",
+                            "application/pdf",
+                            use_container_width=True,
+                            key=f"dl_upd_comp_{order['order_id']}",
                         )
         else:
-            st.info("Nu există comenzi pentru update.")
+            st.info(
+                "📝 No orders yet. Create your first order in the 'New Order' tab!"
+            )
 
-    # TAB 4 - REPORTS
+    # TAB 4: REPORTS
     with tab4:
-        st.header("Rapoarte")
+        st.header("Reports & Analytics")
         df = crm.list_orders_df()
         if not df.empty:
-            total_rev = df["total_cost"].sum()
             col1, col2, col3 = st.columns(3)
-            col1.metric("Total venit", f"{total_rev:.2f} RON")
-            col2.metric(
-                "Comenzi finalizate", len(df[df["status"] == "Completed"])
+            col1.metric("💰 Total Revenue", f"{df['total_cost'].sum():.2f} RON")
+            avg_cost = (
+                df[df["total_cost"] > 0]["total_cost"].mean()
+                if len(df[df["total_cost"] > 0]) > 0
+                else 0
             )
-            col3.metric("Clienți unici", df["client_name"].nunique())
+            col2.metric("📊 Average Cost", f"{avg_cost:.2f} RON")
+            col3.metric("👥 Unique Clients", df["client_name"].nunique())
+
+            st.divider()
+            st.subheader("Orders by Status")
+            st.bar_chart(df["status"].value_counts())
         else:
-            st.info("Nu există date pentru rapoarte.")
+            st.info("📝 No data yet. Create orders to see reports!")
 
 
 if __name__ == "__main__":
