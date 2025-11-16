@@ -613,6 +613,8 @@ def main():
         st.session_state["crm"] = PrinterServiceCRM(conn)
 
     crm = st.session_state["crm"]
+    # Citim toate comenzile o singură dată per rulare
+    df_all_orders = crm.list_orders_df()
 
     tab1, tab2, tab3, tab4 = st.tabs(
         ["📥 New Order", "📋 All Orders", "✏️ Update Order", "📊 Reports"]
@@ -710,7 +712,7 @@ def main():
     # TAB 2: ALL ORDERS
     with tab2:
         st.header("All Service Orders")
-        df = crm.list_orders_df()
+        df = df_all_orders
         if not df.empty:
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("📊 Total Orders", len(df))
@@ -751,7 +753,7 @@ def main():
 
     with tab3:
         st.header("Update Service Order")
-        df = crm.list_orders_df()
+        df = df_all_orders
         if not df.empty:
             selected_order_id = st.selectbox(
                 "Select Order to Update",
@@ -760,7 +762,11 @@ def main():
             )
     
             if selected_order_id:
-                order = crm.get_order(selected_order_id)
+                order_row = df[df["order_id"] == selected_order_id]
+                if order_row.empty:
+                st.error("❌ Order not found in current data. Try refreshing the page.")
+                else:
+                order = order_row.iloc[0].to_dict()
                 if order:
                     # ----- Info de sus -----
                     col1, col2 = st.columns(2)
