@@ -647,23 +647,6 @@ def main():
                 key="update_order_select",
                 label_visibility="collapsed",  # Ascunde label-ul
             )
-            
-            # Afișează deja select-ul în mod vizibil
-            if selected_order_id:
-                order_row = df[df["order_id"] == selected_order_id]
-                if not order_row.empty:
-                    order = order_row.iloc[0].to_dict()
-            
-                    # Afișează datele direct (ca în screenshot-ul tău, sus)
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
-                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
-                    with col2:
-                        st.write(f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
-                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
-            
-                    st.divider()
 
 
             if selected_order_id:
@@ -674,13 +657,17 @@ def main():
                     order = order_row.iloc[0].to_dict()
 
                     # Display basic info
-                    col1, col2 = st.columns(2)
+                    col1, col2 = st.columns(4)
                     with col1:
+                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
+                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
                         st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
                     with col2:
                         st.write(f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
                         st.write(f"**Received:** {safe_text(order.get('date_received'))}")
+                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
+                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
 
                     st.divider()
 
