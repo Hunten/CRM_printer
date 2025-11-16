@@ -128,191 +128,303 @@ def get_sheets_connection():
         return None
 
 
-# ============================================================================
-# PDF GENERATION
-# ============================================================================
 def generate_initial_receipt_pdf(order, company_info, logo_image=None):
-    """PDF bon predare echipament (received order)"""
     buffer = io.BytesIO()
-    width, height = 210 * mm, 148.5 * mm
+    width, height = 210*mm, 148.5*mm
     c = canvas.Canvas(buffer, pagesize=(width, height))
-
-    # Logo
     if logo_image:
         try:
             logo = Image.open(logo_image)
-            logo.thumbnail((150, 95), Image.Resampling.LANCZOS)
+            logo.thumbnail((150,95), Image.Resampling.LANCZOS)
             logo_buffer = io.BytesIO()
-            logo.save(logo_buffer, format="PNG")
+            logo.save(logo_buffer, format='PNG')
             logo_buffer.seek(0)
-            c.drawImage(
-                ImageReader(logo_buffer),
-                10 * mm, height - 30 * mm,
-                width=40 * mm, height=25 * mm,
-                preserveAspectRatio=True, mask="auto",
-            )
-        except Exception:
-            c.setFillColor(colors.HexColor("#f0f0f0"))
-            c.rect(10 * mm, height - 30 * mm, 40 * mm, 25 * mm, fill=1, stroke=1)
+            c.drawImage(ImageReader(logo_buffer), 10*mm, height-30*mm, width=40*mm, height=25*mm, preserveAspectRatio=True, mask='auto')
+        except:
+            c.setFillColor(colors.HexColor('#f0f0f0'))
+            c.rect(10*mm, height-30*mm, 40*mm, 25*mm, fill=1, stroke=1)
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(15*mm, height-20*mm, "[LOGO]")
     else:
-        c.setFillColor(colors.HexColor("#f0f0f0"))
-        c.rect(10 * mm, height - 30 * mm, 40 * mm, 25 * mm, fill=1, stroke=1)
-
-    # Company info
+        c.setFillColor(colors.HexColor('#f0f0f0'))
+        c.rect(10*mm, height-30*mm, 40*mm, 25*mm, fill=1, stroke=1)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(15*mm, height-20*mm, "[LOGO]")
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(10 * mm, height - 35 * mm, remove_diacritics(company_info.get("company_name", "")))
+    c.drawString(10*mm, height-35*mm, remove_diacritics(company_info.get('company_name','')))
     c.setFont("Helvetica", 8)
-    y_pos = height - 40 * mm
-    c.drawString(10 * mm, y_pos, remove_diacritics(company_info.get("company_address", "")))
-    y_pos -= 3.5 * mm
-    c.drawString(10 * mm, y_pos, f"CUI: {company_info.get('cui','')} | Reg.Com: {company_info.get('reg_com','')}")
-    y_pos -= 3.5 * mm
-    c.drawString(10 * mm, y_pos, f"Tel: {company_info.get('phone','')} | {company_info.get('email','')}")
-
-    # Title
+    y_pos = height-40*mm
+    c.drawString(10*mm, y_pos, remove_diacritics(company_info.get('company_address','')))
+    y_pos -= 3.5*mm
+    c.drawString(10*mm, y_pos, f"CUI: {company_info.get('cui','')} | Reg.Com: {company_info.get('reg_com','')}")
+    y_pos -= 3.5*mm
+    c.drawString(10*mm, y_pos, f"Tel: {company_info.get('phone','')} | {company_info.get('email','')}")
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(120*mm, height-15*mm, "CLIENT")
+    c.setFont("Helvetica", 8)
+    y_pos = height-20*mm
+    c.drawString(120*mm, y_pos, f"Nume: {remove_diacritics(order['client_name'])}")
+    y_pos -= 3.5*mm
+    c.drawString(120*mm, y_pos, f"Tel: {order['client_phone']}")
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(105 * mm, height - 55 * mm, "BON PREDARE ECHIPAMENT IN SERVICE")
+    c.drawCentredString(105*mm, height-55*mm, "BON PREDARE ECHIPAMENT IN SERVICE")
     c.setFont("Helvetica-Bold", 10)
-    c.setFillColor(colors.HexColor("#0066cc"))
-    c.drawCentredString(105 * mm, height - 62 * mm, f"Nr. Comanda: {order['order_id']}")
+    c.setFillColor(colors.HexColor('#0066cc'))
+    c.drawCentredString(105*mm, height-62*mm, f"Nr. Comanda: {order['order_id']}")
     c.setFillColor(colors.black)
-
-    # Details
-    y_pos = height - 72 * mm
+    y_pos = height-72*mm
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(10 * mm, y_pos, "DETALII ECHIPAMENT:")
-    y_pos -= 5 * mm
+    c.drawString(10*mm, y_pos, "DETALII ECHIPAMENT:")
+    y_pos -= 5*mm
     c.setFont("Helvetica", 8)
-    c.drawString(10 * mm, y_pos, f"Imprimanta: {remove_diacritics(safe_text(order.get('printer_brand')))} {remove_diacritics(safe_text(order.get('printer_model')))}")
-    y_pos -= 4 * mm
-    c.drawString(10 * mm, y_pos, f"Serie: {safe_text(order.get('printer_serial','N/A'))}")
-    y_pos -= 4 * mm
-    c.drawString(10 * mm, y_pos, f"Data predarii: {safe_text(order.get('date_received'))}")
-
-    if order.get("accessories"):
-        y_pos -= 4 * mm
-        c.drawString(10 * mm, y_pos, f"Accesorii: {remove_diacritics(safe_text(order.get('accessories')))}")
-
-    y_pos -= 6 * mm
+    c.drawString(10*mm, y_pos, f"Imprimanta: {remove_diacritics(order['printer_brand'])} {remove_diacritics(order['printer_model'])}")
+    y_pos -= 4*mm
+    c.drawString(10*mm, y_pos, f"Serie: {order.get('printer_serial','N/A')}")
+    y_pos -= 4*mm
+    c.drawString(10*mm, y_pos, f"Data predarii: {order['date_received']}")
+    if order.get('accessories'):
+        y_pos -= 4*mm
+        c.drawString(10*mm, y_pos, f"Accesorii: {remove_diacritics(order['accessories'])}")
+    y_pos -= 6*mm
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(10 * mm, y_pos, "PROBLEMA RAPORTATA:")
-    y_pos -= 4 * mm
+    c.drawString(10*mm, y_pos, "PROBLEMA RAPORTATA:")
+    y_pos -= 4*mm
     c.setFont("Helvetica", 8)
-    issue_text = remove_diacritics(safe_text(order.get("issue_description")))
-    # Simple text wrapping
+    issue_text = remove_diacritics(order['issue_description'])
+    text_object = c.beginText(10*mm, y_pos)
+    text_object.setFont("Helvetica", 8)
     words = issue_text.split()
     line = ""
     for word in words:
         test_line = line + word + " "
-        if c.stringWidth(test_line, "Helvetica", 8) < 190 * mm:
+        if c.stringWidth(test_line, "Helvetica", 8) < 190*mm:
             line = test_line
         else:
-            c.drawString(10 * mm, y_pos, line)
-            y_pos -= 4 * mm
+            text_object.textLine(line)
             line = word + " "
-    if line:
-        c.drawString(10 * mm, y_pos, line)
-
-    # Signatures
-    y_pos = 25 * mm
-    c.rect(10 * mm, y_pos, 85 * mm, 20 * mm)
+    text_object.textLine(line)
+    c.drawText(text_object)
+    y_pos = 25*mm
+    c.rect(10*mm, y_pos, 85*mm, 20*mm)
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(12 * mm, y_pos + 17 * mm, "OPERATOR SERVICE")
+    c.drawString(12*mm, y_pos+17*mm, "OPERATOR SERVICE")
     c.setFont("Helvetica", 7)
-    c.drawString(12 * mm, y_pos + 2 * mm, "Semnatura si stampila")
-
-    c.rect(115 * mm, y_pos, 85 * mm, 20 * mm)
+    c.drawString(12*mm, y_pos+2*mm, "Semnatura si Stampila")
+    c.rect(115*mm, y_pos, 85*mm, 20*mm)
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(117 * mm, y_pos + 17 * mm, "CLIENT")
+    c.drawString(117*mm, y_pos+17*mm, "CLIENT")
     c.setFont("Helvetica", 7)
-    c.drawString(117 * mm, y_pos + 13 * mm, f"Nume: {remove_diacritics(safe_text(order.get('client_name')))}")
-    c.drawString(117 * mm, y_pos + 2 * mm, "Semnatura")
-
+    c.drawString(117*mm, y_pos+13*mm, f"Nume: {remove_diacritics(order['client_name'])}")
+    c.drawString(117*mm, y_pos+2*mm, "Semnatura")
     c.setFont("Helvetica", 6)
-    c.drawCentredString(105 * mm, 3 * mm, "Acest document constituie dovada predarii echipamentului in service.")
-
+    c.drawCentredString(105*mm, 3*mm, "Acest document constituie dovada predarii echipamentului in service.")
+    c.setDash(3, 3)
+    c.line(5*mm, 1*mm, 205*mm, 1*mm)
     c.save()
     buffer.seek(0)
     return buffer
 
 
-def generate_completion_receipt_pdf(order, company_info, logo_image=None):
-    """PDF bon finalizare (completion receipt)"""
-    buffer = io.BytesIO()
-    width, height = 210 * mm, 148.5 * mm
-    c = canvas.Canvas(buffer, pagesize=(width, height))
+# ============================================================================
+# PDF GENERATION - COMPLETION RECEIPT (3-COLUMN LAYOUT)
+# ============================================================================
 
-    # Logo
+def generate_completion_receipt_pdf(order, company_info, logo_image=None):
+    buffer = io.BytesIO()
+    width, height = 210*mm, 148.5*mm
+    c = canvas.Canvas(buffer, pagesize=(width, height))
+    header_y_start = height-10*mm
+    x_business = 10*mm
+    y_pos = header_y_start
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(x_business, y_pos, remove_diacritics(company_info.get('company_name','')))
+    y_pos -= 3.5*mm
+    c.setFont("Helvetica", 7)
+    c.drawString(x_business, y_pos, remove_diacritics(company_info.get('company_address','')))
+    y_pos -= 3*mm
+    c.drawString(x_business, y_pos, f"CUI: {company_info.get('cui','')}")
+    y_pos -= 3*mm
+    c.drawString(x_business, y_pos, f"Reg.Com: {company_info.get('reg_com','')}")
+    y_pos -= 3*mm
+    c.drawString(x_business, y_pos, f"Tel: {company_info.get('phone','')}")
+    y_pos -= 3*mm
+    c.drawString(x_business, y_pos, company_info.get('email',''))
+    logo_x = 85*mm
+    logo_y = header_y_start-20*mm
+    logo_width = 40*mm
+    logo_height = 25*mm
     if logo_image:
         try:
             logo = Image.open(logo_image)
-            logo.thumbnail((150, 95), Image.Resampling.LANCZOS)
+            logo.thumbnail((150,95), Image.Resampling.LANCZOS)
             logo_buffer = io.BytesIO()
-            logo.save(logo_buffer, format="PNG")
+            logo.save(logo_buffer, format='PNG')
             logo_buffer.seek(0)
-            c.drawImage(
-                ImageReader(logo_buffer),
-                10 * mm, height - 30 * mm,
-                width=40 * mm, height=25 * mm,
-                preserveAspectRatio=True, mask="auto",
-            )
-        except Exception:
-            pass
-
-    # Title
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColor(colors.HexColor("#00aa00"))
-    c.drawCentredString(105 * mm, height - 40 * mm, "BON FINALIZARE REPARATIE")
-    c.setFont("Helvetica-Bold", 11)
-    c.drawCentredString(105 * mm, height - 48 * mm, f"Nr. Comanda: {order['order_id']}")
-    
+            c.drawImage(ImageReader(logo_buffer), logo_x, logo_y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
+        except:
+            c.setFillColor(colors.HexColor('#f0f0f0'))
+            c.rect(logo_x, logo_y, logo_width, logo_height, fill=1, stroke=1)
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica-Bold", 10)
+            c.drawCentredString(logo_x+(logo_width/2), logo_y+(logo_height/2), "[LOGO]")
+    else:
+        c.setFillColor(colors.HexColor('#f0f0f0'))
+        c.rect(logo_x, logo_y, logo_width, logo_height, fill=1, stroke=1)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawCentredString(logo_x+(logo_width/2), logo_y+(logo_height/2), "[LOGO]")
     c.setFillColor(colors.black)
-    c.setFont("Helvetica", 9)
-    y_pos = height - 60 * mm
-    c.drawString(10 * mm, y_pos, f"Client: {safe_text(order.get('client_name'))}")
-    y_pos -= 5 * mm
-    c.drawString(10 * mm, y_pos, f"Telefon: {safe_text(order.get('client_phone'))}")
-    y_pos -= 5 * mm
-    c.drawString(10 * mm, y_pos, f"Echipament: {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
-    
-    y_pos -= 8 * mm
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(10 * mm, y_pos, "REPARATII EFECTUATE:")
-    y_pos -= 5 * mm
-    c.setFont("Helvetica", 8)
-    repair_text = remove_diacritics(safe_text(order.get('repair_details', 'N/A')))
+    x_client = 155*mm
+    y_pos = header_y_start
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(x_client, y_pos, "CLIENT")
+    y_pos -= 3.5*mm
+    c.setFont("Helvetica", 7)
+    c.drawString(x_client, y_pos, f"Nume:")
+    y_pos -= 3*mm
+    client_name = remove_diacritics(order['client_name'])
+    if len(client_name) > 20:
+        c.drawString(x_client, y_pos, client_name[:20])
+        y_pos -= 3*mm
+        c.drawString(x_client, y_pos, client_name[20:40])
+    else:
+        c.drawString(x_client, y_pos, client_name)
+    y_pos -= 3*mm
+    c.drawString(x_client, y_pos, f"Tel:")
+    y_pos -= 3*mm
+    c.drawString(x_client, y_pos, order['client_phone'])
+    title_y = height-38*mm
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(105*mm, title_y, "BON FINALIZARE REPARATIE")
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(colors.HexColor('#00aa00'))
+    c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {order['order_id']}")
+    c.setFillColor(colors.black)
+    y_start = height-50*mm
+    col_width = 63*mm
+    x_left = 10*mm
+    y_pos = y_start
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(x_left, y_pos, "DETALII ECHIPAMENT:")
+    y_pos -= 3.5*mm
+    c.setFont("Helvetica", 7)
+    printer_info = f"{remove_diacritics(order['printer_brand'])} {remove_diacritics(order['printer_model'])}"
+    if len(printer_info) > 25:
+        printer_info = printer_info[:25] + "..."
+    c.drawString(x_left, y_pos, printer_info)
+    y_pos -= 2.5*mm
+    serial = order.get('printer_serial','N/A')
+    if len(serial) > 20:
+        serial = serial[:20] + "..."
+    c.drawString(x_left, y_pos, f"Serie: {serial}")
+    y_pos -= 2.5*mm
+    c.drawString(x_left, y_pos, f"Predare: {order['date_received']}")
+    if order.get('date_completed'):
+        y_pos -= 2.5*mm
+        c.drawString(x_left, y_pos, f"Finalizare: {order['date_completed']}")
+    x_middle = 73*mm
+    y_pos = y_start
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(x_middle, y_pos, "REPARATII EFECTUATE:")
+    y_pos -= 3.5*mm
+    c.setFont("Helvetica", 7)
+    repair_text = remove_diacritics(order.get('repair_details','N/A'))
     words = repair_text.split()
     line = ""
+    line_count = 0
+    max_lines = 5
     for word in words:
         test_line = line + word + " "
-        if c.stringWidth(test_line, "Helvetica", 8) < 190 * mm:
+        if c.stringWidth(test_line, "Helvetica", 7) < (col_width-2*mm):
             line = test_line
         else:
-            c.drawString(10 * mm, y_pos, line)
-            y_pos -= 4 * mm
-            line = word + " "
-    if line:
-        c.drawString(10 * mm, y_pos, line)
-    
-    y_pos -= 6 * mm
+            if line_count < max_lines:
+                c.drawString(x_middle, y_pos, line.strip())
+                y_pos -= 2.5*mm
+                line_count += 1
+                line = word + " "
+            else:
+                break
+    if line and line_count < max_lines:
+        c.drawString(x_middle, y_pos, line.strip())
+    x_right = 136*mm
+    y_pos = y_start
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(x_right, y_pos, "PIESE UTILIZATE:")
+    y_pos -= 3.5*mm
+    c.setFont("Helvetica", 7)
+    parts_text = remove_diacritics(order.get('parts_used','N/A'))
+    words = parts_text.split()
+    line = ""
+    line_count = 0
+    for word in words:
+        test_line = line + word + " "
+        if c.stringWidth(test_line, "Helvetica", 7) < (col_width-2*mm):
+            line = test_line
+        else:
+            if line_count < max_lines:
+                c.drawString(x_right, y_pos, line.strip())
+                y_pos -= 2.5*mm
+                line_count += 1
+                line = word + " "
+            else:
+                break
+    if line and line_count < max_lines:
+        c.drawString(x_right, y_pos, line.strip())
+    y_cost = height-78*mm
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(10 * mm, y_pos, "PIESE UTILIZATE:")
-    y_pos -= 5 * mm
+    c.drawString(10*mm, y_cost, "COSTURI:")
+    y_cost -= 4*mm
+    table_x = 10*mm
+    table_width = 70*mm
+    row_height = 5*mm
+    c.rect(table_x, y_cost-(4*row_height), table_width, 4*row_height)
+    c.setFillColor(colors.HexColor('#e0e0e0'))
+    c.rect(table_x, y_cost-row_height, table_width, row_height, fill=1)
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Descriere")
+    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, "Suma (RON)")
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
+    y_cost -= row_height
     c.setFont("Helvetica", 8)
-    c.drawString(10 * mm, y_pos, safe_text(order.get('parts_used', 'N/A')))
-    
-    y_pos -= 8 * mm
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(10 * mm, y_pos, f"Manopera: {safe_float(order.get('labor_cost')):.2f} RON")
-    y_pos -= 6 * mm
-    c.drawString(10 * mm, y_pos, f"Piese: {safe_float(order.get('parts_cost')):.2f} RON")
-    y_pos -= 8 * mm
-    c.setFillColor(colors.HexColor("#00aa00"))
-    c.setFont("Helvetica-Bold", 14)
-    total = safe_float(order.get('total_cost'))
-    c.drawString(10 * mm, y_pos, f"TOTAL: {total:.2f} RON")
-
+    c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Manopera (Labor)")
+    labor = float(order.get('labor_cost',0))
+    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{labor:.2f}")
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
+    y_cost -= row_height
+    c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Piese (Parts)")
+    parts = float(order.get('parts_cost',0))
+    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{parts:.2f}")
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
+    y_cost -= row_height
+    c.setFillColor(colors.HexColor('#f0f0f0'))
+    c.rect(table_x, y_cost-row_height, table_width, row_height, fill=1)
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "TOTAL")
+    total = float(order.get('total_cost', labor+parts))
+    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{total:.2f}")
+    sig_y = 22*mm
+    sig_height = 18*mm
+    c.rect(10*mm, sig_y, 85*mm, sig_height)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(12*mm, sig_y+sig_height-3*mm, "OPERATOR SERVICE")
+    c.setFont("Helvetica", 7)
+    c.drawString(12*mm, sig_y+2*mm, "Semnatura si Stampila")
+    c.rect(115*mm, sig_y, 85*mm, sig_height)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(117*mm, sig_y+sig_height-3*mm, "CLIENT")
+    c.setFont("Helvetica", 7)
+    c.drawString(117*mm, sig_y+sig_height-7*mm, f"Nume: {remove_diacritics(order['client_name'])}")
+    c.drawString(117*mm, sig_y+2*mm, "Semnatura")
+    c.setFont("Helvetica", 6)
+    c.drawCentredString(105*mm, 3*mm, "Acest document constituie factura si dovada finalizarii reparatiei.")
+    c.setDash(3, 3)
+    c.line(5*mm, 1*mm, 205*mm, 1*mm)
     c.save()
     buffer.seek(0)
     return buffer
