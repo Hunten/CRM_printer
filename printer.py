@@ -660,12 +660,12 @@ def main():
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
-                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
-                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
                         st.write(f"**Printer Name:** {safe_text(order.get('printer_brand'))}")
-                    with col2:
                         st.write(f"**Printer Model:** {safe_text(order.get('printer_model'))}")
                         st.write(f"**Printer Serial:** {safe_text(order.get('printer_serial'))}")
+                    with col2:
+                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
+                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
                         st.write(f"**Issue reported:** {safe_text(order.get('issue_description'))}")
                         st.write(f"**Accessories:** {safe_text(order.get('accessories'))}")
                         st.write(f"**Internal notes:** {safe_text(order.get('notes'))}")
