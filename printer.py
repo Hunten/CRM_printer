@@ -22,10 +22,6 @@ st.set_page_config(
     page_icon="🖨️",
     layout="wide",
 )
-@st.cache_data(ttl=60)
-def _cached_read_sheet(conn, worksheet_name: str):
-    """Citește foaia din Google Sheets cu cache 60s ca să nu depășim cota."""
-    return conn.read(worksheet=worksheet_name)
 
 
 # -------------------------------------------------------------------
@@ -364,25 +360,31 @@ class PrinterServiceCRM:
 
     def _read_df(self, raw: bool = False) -> pd.DataFrame | None:
         """
-        Citește toată foaia prin cache (max 1 citire / 60s).
-        Dacă apare o eroare, nu întoarce DataFrame gol în liniște.
+        Citește foaia din Google Sheets folosind caching-ul intern al
+        st-gsheets-connection (ttl=60 sec), ca să nu mai lovești cota de 60
+        request-uri/minut.
         """
         try:
-            df = _cached_read_sheet(self.conn, self.worksheet)
+            # IMPORTANT: folosim ttl=60, NU 0
+            df = self.conn.read(worksheet=self.worksheet, ttl=60)
+
             if df is None:
                 return None
             if raw:
                 return df
             if df.empty:
                 return pd.DataFrame()
+
             # conversie numerică
             for col in ["labor_cost", "parts_cost", "total_cost"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
             return df
+
         except Exception as e:
             st.sidebar.error(f"❌ Error reading from Google Sheets: {e}")
             return None if raw else pd.DataFrame()
+
 
     def _write_df(self, df: pd.DataFrame, allow_empty: bool = False) -> bool:
         """
