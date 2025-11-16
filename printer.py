@@ -658,10 +658,9 @@ def main():
                         st.session_state["last_created_order"] = order_id
                         st.success(f"✅ Order Created: **{order_id}**")
                         st.balloons()
-                            crm = st.session_state["crm"]
-
-    # Citește o singură dată toate comenzile
-    df_all = crm.list_orders_df()
+                        crm = st.session_state["crm"]
+                        # Citește o singură dată toate comenzile
+                        df_all = crm.list_orders_df()
 
                 else:
                     st.error("❌ Please fill in all required fields (*)")
