@@ -378,29 +378,24 @@ class PrinterServiceCRM:
             else:
                 self.next_order_id = 1
 
-    def _read_df(self, raw: bool = False) -> pd.DataFrame | None:
+    def _read_df(self, raw: bool = False, ttl: int = 60) -> pd.DataFrame | None:
         """
-        Citește foaia din Google Sheets folosind caching-ul intern al
-        st-gsheets-connection (ttl=60 sec), ca să nu mai lovești cota de 60
-        request-uri/minut.
+        Citește foaia din Google Sheets.
+        ttl = 60 pentru majoritatea cazurilor,
+        ttl = 0 pentru citiri care trebuie să vadă imediat ce e în Sheets.
         """
         try:
-            # IMPORTANT: folosim ttl=60, NU 0
-            df = self.conn.read(worksheet=self.worksheet, ttl=60)
-
+            df = self.conn.read(worksheet=self.worksheet, ttl=ttl)
             if df is None:
                 return None
             if raw:
                 return df
             if df.empty:
                 return pd.DataFrame()
-
-            # conversie numerică
             for col in ["labor_cost", "parts_cost", "total_cost"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
             return df
-
         except Exception as e:
             st.sidebar.error(f"❌ Error reading from Google Sheets: {e}")
             return None if raw else pd.DataFrame()
@@ -492,11 +487,11 @@ class PrinterServiceCRM:
         return None
 
     def list_orders_df(self) -> pd.DataFrame:
-        df = self._read_df()
+        df = self._read_df(raw=False, ttl=60)
         return df if df is not None else pd.DataFrame()
 
     def get_order(self, order_id: str):
-        df = self._read_df()
+        df = self._read_df(raw=False, ttl=0)  # forțează citire proaspătă
         if df is None or df.empty or "order_id" not in df.columns:
             return None
         row = df[df["order_id"] == order_id]
@@ -509,7 +504,7 @@ class PrinterServiceCRM:
         Citește foaia completă, modifică DOAR rândul cu order_id, apoi rescrie tot df-ul.
         NU permite scrierea unui df gol, deci nu poate șterge toată baza de date.
         """
-        df = self._read_df(raw=True)
+        df = self._read_df(raw=True, ttl=0)
         if df is None or df.empty or "order_id" not in df.columns:
             st.sidebar.error("❌ Cannot update: no data found in Google Sheets.")
             return False
@@ -863,11 +858,6 @@ def main():
     
                         if crm.update_order(selected_order_id, **updates):
                             st.success("✅ Order updated successfully!")
-    
-                            # curățăm câmpurile text după update
-                            st.session_state["update_repair_details"] = ""
-                            st.session_state["update_parts_used"] = ""
-                            st.session_state["update_technician"] = ""
     
                             # opțional, poți reselecta nimic
                             # st.session_state["update_order_select"] = ""
