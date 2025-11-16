@@ -460,16 +460,22 @@ def main():
     st.title("🖨️ Printer Service CRM")
     st.markdown("### Professional Printer Service Management System")
 
-    # Session state defaults
+    # Load company info from Secrets (NOT from session state default)
     if "company_info" not in st.session_state:
-        st.session_state["company_info"] = {
-            "company_name": "Print Service Pro SRL",
-            "company_address": "Str. Industriei Nr. 45, Cluj-Napoca",
-            "cui": "RO98765432",
-            "reg_com": "J12/5678/2024",
-            "phone": "+40 364 123 456",
-            "email": "service@printservicepro.ro",
-        }
+        try:
+            # Citim din secrets
+            st.session_state["company_info"] = dict(st.secrets.get("company_info", {}))
+        except Exception:
+            # Fallback doar dacă secrets nu sunt setate
+            st.session_state["company_info"] = {
+                "company_name": "Company Name",
+                "company_address": "Address",
+                "cui": "CUI",
+                "reg_com": "Reg.Com",
+                "phone": "Phone",
+                "email": "Email",
+            }
+    
     if "last_created_order" not in st.session_state:
         st.session_state["last_created_order"] = None
     if "logo_image" not in st.session_state:
@@ -633,11 +639,32 @@ def main():
         df = df_all_orders
 
         if not df.empty:
+            # Selectează dintr-o listă
+            available_orders = df["order_id"].tolist()
             selected_order_id = st.selectbox(
-                "Select Order to Update",
-                df["order_id"].tolist(),
+                "Select Order",
+                available_orders,
                 key="update_order_select",
+                label_visibility="collapsed",  # Ascunde label-ul
             )
+            
+            # Afișează deja select-ul în mod vizibil
+            if selected_order_id:
+                order_row = df[df["order_id"] == selected_order_id]
+                if not order_row.empty:
+                    order = order_row.iloc[0].to_dict()
+            
+                    # Afișează datele direct (ca în screenshot-ul tău, sus)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
+                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
+                    with col2:
+                        st.write(f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
+                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
+            
+                    st.divider()
+
 
             if selected_order_id:
                 order_row = df[df["order_id"] == selected_order_id]
