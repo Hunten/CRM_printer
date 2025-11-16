@@ -301,7 +301,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
 
 
 # -------------------------------------------------------------------
-# CRM CLASS - GOOGLE SHEETS
+# CRM CLASS - GOOGLE SHEETS (SAFE VERSION)
 # -------------------------------------------------------------------
 class PrinterServiceCRM:
     def __init__(self, conn: GSheetsConnection):
@@ -314,12 +314,9 @@ class PrinterServiceCRM:
 
     def _init_sheet(self):
         """Ensure headers exist and compute next_order_id."""
-        try:
-            df = self.conn.read(worksheet=self.worksheet, ttl=0)
-        except Exception:
-            df = pd.DataFrame()
-
-        if df.empty:
+        df = self._read_df(raw=True)
+        if df is None or df.empty:
+            # create empty schema
             columns = [
                 "order_id",
                 "client_name",
@@ -344,7 +341,8 @@ class PrinterServiceCRM:
                 "total_cost",
             ]
             df = pd.DataFrame(columns=columns)
-            self.conn.update(worksheet=self.worksheet, data=df)
+            # scriem schema o singură dată, nu se pierde nimic
+            self._write_df(df, allow_empty=False)
             self.next_order_id = 1
         else:
             if "order_id" in df.columns and not df["order_id"].isna().all():
@@ -360,20 +358,49 @@ class PrinterServiceCRM:
             else:
                 self.next_order_id = 1
 
-    def _read_df(self) -> pd.DataFrame:
+    def _read_df(self, raw: bool = False) -> pd.DataFrame | None:
+        """
+        Citește toată foaia.
+        Dacă apare o eroare, afișează mesaj și NU întoarce DataFrame gol în liniște.
+        """
         try:
             df = self.conn.read(worksheet=self.worksheet, ttl=0)
-            return df if not df.empty else pd.DataFrame()
-        except Exception:
-            return pd.DataFrame()
+            if df is None:
+                return None
+            if raw:
+                return df
+            if df.empty:
+                return pd.DataFrame()
+            # conversie numerică
+            for col in ["labor_cost", "parts_cost", "total_cost"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+            return df
+        except Exception as e:
+            st.sidebar.error(f"❌ Error reading from Google Sheets: {e}")
+            return None if raw else pd.DataFrame()
 
-    def _write_df(self, df: pd.DataFrame) -> bool:
+    def _write_df(self, df: pd.DataFrame, allow_empty: bool = False) -> bool:
+        """
+        Scrie ÎNTREGUL DataFrame în Sheets.
+        Dacă df este gol și allow_empty=False, refuză scrierea ca să nu șteargă toate datele.
+        """
         try:
+            if df is None:
+                st.sidebar.error("❌ Tried to write None DataFrame to Sheets.")
+                return False
+
+            if df.empty and not allow_empty:
+                st.sidebar.error(
+                    "⚠️ Refuz să scriu un DataFrame gol în Google Sheets ca să nu pierzi toate comenzile."
+                )
+                return False
+
             self.conn.update(worksheet=self.worksheet, data=df)
             st.sidebar.success("💾 Saved to Google Sheets!")
             return True
         except Exception as e:
-            st.sidebar.error(f"Error saving to Google Sheets: {e}")
+            st.sidebar.error(f"❌ Error saving to Google Sheets: {e}")
             return False
 
     # ---------- CRUD ----------
@@ -426,10 +453,11 @@ class PrinterServiceCRM:
             ]
         )
 
-        df = self._read_df()
-        if df.empty:
+        df = self._read_df(raw=True)
+        if df is None or df.empty:
             updated_df = new_order
         else:
+            # avem deja date → le păstrăm și adăugăm doar rândul nou
             updated_df = pd.concat([df, new_order], ignore_index=True)
 
         if self._write_df(updated_df):
@@ -439,14 +467,11 @@ class PrinterServiceCRM:
 
     def list_orders_df(self) -> pd.DataFrame:
         df = self._read_df()
-        for col in ["labor_cost", "parts_cost", "total_cost"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-        return df
+        return df if df is not None else pd.DataFrame()
 
     def get_order(self, order_id: str):
         df = self._read_df()
-        if df.empty or "order_id" not in df.columns:
+        if df is None or df.empty or "order_id" not in df.columns:
             return None
         row = df[df["order_id"] == order_id]
         if row.empty:
@@ -455,32 +480,31 @@ class PrinterServiceCRM:
 
     def update_order(self, order_id: str, **kwargs) -> bool:
         """
-        IMPORTANT:
-        - Read entire sheet
-        - Modify only the matching row
-        - Write back the ENTIRE DataFrame
-        So no rows are deleted.
+        Citește foaia completă, modifică DOAR rândul cu order_id, apoi rescrie tot df-ul.
+        NU permite scrierea unui df gol, deci nu poate șterge toată baza de date.
         """
-        df = self._read_df()
-        if df.empty or "order_id" not in df.columns:
+        df = self._read_df(raw=True)
+        if df is None or df.empty or "order_id" not in df.columns:
+            st.sidebar.error("❌ Cannot update: no data found in Google Sheets.")
             return False
 
         mask = df["order_id"] == order_id
         if not mask.any():
+            st.sidebar.error(f"❌ Order {order_id} not found in sheet.")
             return False
 
-        # Apply updates
         for key, value in kwargs.items():
             if key in df.columns:
                 df.loc[mask, key] = value
 
-        # Recalculate total if needed
+        # recalcul total
         if "labor_cost" in df.columns and "parts_cost" in df.columns:
             labor = pd.to_numeric(df.loc[mask, "labor_cost"], errors="coerce").fillna(0)
             parts = pd.to_numeric(df.loc[mask, "parts_cost"], errors="coerce").fillna(0)
             df.loc[mask, "total_cost"] = labor + parts
 
         return self._write_df(df)
+
 
 
 # -------------------------------------------------------------------
