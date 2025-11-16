@@ -755,158 +755,158 @@ def main():
             )
 
     # TAB 3: UPDATE ORDER
-with tab3:
-    st.header("Update Service Order")
-    df = crm.list_orders_df()
-    if not df.empty:
-        # selectăm comanda, dar FĂRĂ să forțăm index care poate da eroare
-        selected_order_id = st.selectbox(
-            "Select Order to Update",
-            df["order_id"].tolist(),
-            key="update_order_select",
-        )
-
-        if selected_order_id:
-            order = crm.get_order(selected_order_id)
-            if order:
-                # --------- info de sus ----------
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write(f"**Client:** {safe_text(order.get('client_name'))}")
-                    st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
-                with col2:
-                    st.write(
-                        f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}"
-                    )
-                    st.write(f"**Received:** {safe_text(order.get('date_received'))}")
-
-                st.divider()
-
-                # --------- status & dates ----------
-                status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
-                current_status = safe_text(order.get("status")) or "Received"
-                if current_status not in status_options:
-                    current_status = "Received"
-                status_index = status_options.index(current_status)
-
-                new_status = st.selectbox(
-                    "Status",
-                    status_options,
-                    index=status_index,
-                    key="update_status",
-                )
-
-                if new_status == "Completed":
-                    actual_pickup_date = st.date_input(
-                        "Actual Pickup Date",
-                        value=date.today(),
-                        key="update_pickup_date",
-                    )
-                else:
-                    actual_pickup_date = None
-
-                # --------- text fields (fără 'nan') ----------
-                st.subheader("Repair Details")
-                repair_details = st.text_area(
-                    "Repairs Performed",
-                    value=safe_text(order.get("repair_details")),
-                    height=100,
-                    key="update_repair_details",
-                )
-                parts_used = st.text_input(
-                    "Parts Used",
-                    value=safe_text(order.get("parts_used")),
-                    key="update_parts_used",
-                )
-                technician = st.text_input(
-                    "Technician",
-                    value=safe_text(order.get("technician")),
-                    key="update_technician",
-                )
-
-                # --------- costs ----------
-                colc1, colc2, colc3 = st.columns(3)
-                labor_cost = colc1.number_input(
-                    "Labor Cost (RON)",
-                    value=safe_float(order.get("labor_cost")),
-                    min_value=0.0,
-                    step=10.0,
-                    key="update_labor_cost",
-                )
-                parts_cost = colc2.number_input(
-                    "Parts Cost (RON)",
-                    value=safe_float(order.get("parts_cost")),
-                    min_value=0.0,
-                    step=10.0,
-                    key="update_parts_cost",
-                )
-                colc3.metric("💰 Total Cost", f"{labor_cost + parts_cost:.2f} RON")
-
-                # --------- buton update ----------
-                if st.button("💾 Update Order", type="primary", key="update_order_btn"):
-                    updates = {
-                        "status": new_status,
-                        "repair_details": repair_details,
-                        "parts_used": parts_used,
-                        "technician": technician,
-                        "labor_cost": labor_cost,
-                        "parts_cost": parts_cost,
-                    }
-                    if new_status == "Ready for Pickup" and not order.get("date_completed"):
-                        updates["date_completed"] = datetime.now().strftime("%Y-%m-%d")
-                    if new_status == "Completed":
-                        updates["date_picked_up"] = (
-                            actual_pickup_date.strftime("%Y-%m-%d")
-                            if actual_pickup_date
-                            else datetime.now().strftime("%Y-%m-%d")
+    with tab3:
+        st.header("Update Service Order")
+        df = crm.list_orders_df()
+        if not df.empty:
+            # selectăm comanda, dar FĂRĂ să forțăm index care poate da eroare
+            selected_order_id = st.selectbox(
+                "Select Order to Update",
+                df["order_id"].tolist(),
+                key="update_order_select",
+            )
+    
+            if selected_order_id:
+                order = crm.get_order(selected_order_id)
+                if order:
+                    # --------- info de sus ----------
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
+                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
+                    with col2:
+                        st.write(
+                            f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}"
                         )
-
-                    if crm.update_order(selected_order_id, **updates):
-                        st.success("✅ Order updated successfully!")
-
-                        # curățăm câmpurile text după update
-                        st.session_state["update_repair_details"] = ""
-                        st.session_state["update_parts_used"] = ""
-                        st.session_state["update_technician"] = ""
-
-                        # opțional, poți reselecta nimic
-                        # st.session_state["update_order_select"] = ""
-
-                        st.rerun()
-
-                # --------- PDF-uri ----------
-                st.divider()
-                st.subheader("📄 Download Receipts")
-                logo = st.session_state.get("logo_image", None)
-                colp1, colp2 = st.columns(2)
-                with colp1:
-                    st.markdown("**Initial Receipt**")
-                    pdf_init = generate_initial_receipt_pdf(
-                        order, st.session_state["company_info"], logo
+                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
+    
+                    st.divider()
+    
+                    # --------- status & dates ----------
+                    status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
+                    current_status = safe_text(order.get("status")) or "Received"
+                    if current_status not in status_options:
+                        current_status = "Received"
+                    status_index = status_options.index(current_status)
+    
+                    new_status = st.selectbox(
+                        "Status",
+                        status_options,
+                        index=status_index,
+                        key="update_status",
                     )
-                    st.download_button(
-                        "📄 Download Initial Receipt",
-                        pdf_init,
-                        f"Initial_{order['order_id']}.pdf",
-                        "application/pdf",
-                        use_container_width=True,
-                        key=f"dl_upd_init_{order['order_id']}",
+    
+                    if new_status == "Completed":
+                        actual_pickup_date = st.date_input(
+                            "Actual Pickup Date",
+                            value=date.today(),
+                            key="update_pickup_date",
+                        )
+                    else:
+                        actual_pickup_date = None
+    
+                    # --------- text fields (fără 'nan') ----------
+                    st.subheader("Repair Details")
+                    repair_details = st.text_area(
+                        "Repairs Performed",
+                        value=safe_text(order.get("repair_details")),
+                        height=100,
+                        key="update_repair_details",
                     )
-                with colp2:
-                    st.markdown("**Completion Receipt**")
-                    pdf_comp = generate_completion_receipt_pdf(
-                        order, st.session_state["company_info"], logo
+                    parts_used = st.text_input(
+                        "Parts Used",
+                        value=safe_text(order.get("parts_used")),
+                        key="update_parts_used",
                     )
-                    st.download_button(
-                        "📄 Download Completion Receipt",
-                        pdf_comp,
-                        f"Completion_{order['order_id']}.pdf",
-                        "application/pdf",
-                        use_container_width=True,
-                        key=f"dl_upd_comp_{order['order_id']}",
+                    technician = st.text_input(
+                        "Technician",
+                        value=safe_text(order.get("technician")),
+                        key="update_technician",
                     )
-    else:
-        st.info("📝 No orders yet. Create your first order in the 'New Order' tab!")
+    
+                    # --------- costs ----------
+                    colc1, colc2, colc3 = st.columns(3)
+                    labor_cost = colc1.number_input(
+                        "Labor Cost (RON)",
+                        value=safe_float(order.get("labor_cost")),
+                        min_value=0.0,
+                        step=10.0,
+                        key="update_labor_cost",
+                    )
+                    parts_cost = colc2.number_input(
+                        "Parts Cost (RON)",
+                        value=safe_float(order.get("parts_cost")),
+                        min_value=0.0,
+                        step=10.0,
+                        key="update_parts_cost",
+                    )
+                    colc3.metric("💰 Total Cost", f"{labor_cost + parts_cost:.2f} RON")
+    
+                    # --------- buton update ----------
+                    if st.button("💾 Update Order", type="primary", key="update_order_btn"):
+                        updates = {
+                            "status": new_status,
+                            "repair_details": repair_details,
+                            "parts_used": parts_used,
+                            "technician": technician,
+                            "labor_cost": labor_cost,
+                            "parts_cost": parts_cost,
+                        }
+                        if new_status == "Ready for Pickup" and not order.get("date_completed"):
+                            updates["date_completed"] = datetime.now().strftime("%Y-%m-%d")
+                        if new_status == "Completed":
+                            updates["date_picked_up"] = (
+                                actual_pickup_date.strftime("%Y-%m-%d")
+                                if actual_pickup_date
+                                else datetime.now().strftime("%Y-%m-%d")
+                            )
+    
+                        if crm.update_order(selected_order_id, **updates):
+                            st.success("✅ Order updated successfully!")
+    
+                            # curățăm câmpurile text după update
+                            st.session_state["update_repair_details"] = ""
+                            st.session_state["update_parts_used"] = ""
+                            st.session_state["update_technician"] = ""
+    
+                            # opțional, poți reselecta nimic
+                            # st.session_state["update_order_select"] = ""
+    
+                            st.rerun()
+    
+                    # --------- PDF-uri ----------
+                    st.divider()
+                    st.subheader("📄 Download Receipts")
+                    logo = st.session_state.get("logo_image", None)
+                    colp1, colp2 = st.columns(2)
+                    with colp1:
+                        st.markdown("**Initial Receipt**")
+                        pdf_init = generate_initial_receipt_pdf(
+                            order, st.session_state["company_info"], logo
+                        )
+                        st.download_button(
+                            "📄 Download Initial Receipt",
+                            pdf_init,
+                            f"Initial_{order['order_id']}.pdf",
+                            "application/pdf",
+                            use_container_width=True,
+                            key=f"dl_upd_init_{order['order_id']}",
+                        )
+                    with colp2:
+                        st.markdown("**Completion Receipt**")
+                        pdf_comp = generate_completion_receipt_pdf(
+                            order, st.session_state["company_info"], logo
+                        )
+                        st.download_button(
+                            "📄 Download Completion Receipt",
+                            pdf_comp,
+                            f"Completion_{order['order_id']}.pdf",
+                            "application/pdf",
+                            use_container_width=True,
+                            key=f"dl_upd_comp_{order['order_id']}",
+                        )
+        else:
+            st.info("📝 No orders yet. Create your first order in the 'New Order' tab!")
 
 
     # TAB 4: REPORTS
