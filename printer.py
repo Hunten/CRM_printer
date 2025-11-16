@@ -657,7 +657,7 @@ def main():
                     order = order_row.iloc[0].to_dict()
 
                     # Display basic info
-                    col1, col2 = st.columns(4)
+                    col1, col2 = st.columns(2)
                     with col1:
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
                         st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
