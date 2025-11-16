@@ -764,9 +764,9 @@ def main():
             if selected_order_id:
                 order_row = df[df["order_id"] == selected_order_id]
                 if order_row.empty:
-                st.error("❌ Order not found in current data. Try refreshing the page.")
+                    st.error("❌ Order not found in current data. Try refreshing the page.")
                 else:
-                order = order_row.iloc[0].to_dict()
+                    order = order_row.iloc[0].to_dict()
                 if order:
                     # ----- Info de sus -----
                     col1, col2 = st.columns(2)
