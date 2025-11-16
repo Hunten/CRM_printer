@@ -662,23 +662,16 @@ def main():
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
                         st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
                         st.write(f"**Received:** {safe_text(order.get('date_received'))}")
-                        st.write(f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
+                        st.write(f"**Printer Name:** {safe_text(order.get('printer_brand'))}")
                     with col2:
-                        st.write(f"**Printer:** {safe_text(order.get('printer_model'))} {safe_text(order.get('printer_model'))}")
-                        st.write(f"**Printer:** {safe_text(order.get('printer_serial'))} {safe_text(order.get('printer_serial'))}")
-                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
-                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
+                        st.write(f"**Printer Model:** {safe_text(order.get('printer_model'))}")
+                        st.write(f"**Printer Serial:** {safe_text(order.get('printer_serial'))}")
+                        st.write(f"**Issue reported:** {safe_text(order.get('issue_description'))}")
+                        st.write(f"**Accessories:** {safe_text(order.get('accessories'))}")
+                        st.write(f"**Internal notes:** {safe_text(order.get('notes'))}")
 
                     st.divider()
 
-                    # Existing details (read-only)
-                    with st.expander("🔎 Original order details", expanded=False):
-                        st.write("**Issue reported:**")
-                        st.write(safe_text(order.get("issue_description")))
-                        st.write("**Accessories:**")
-                        st.write(safe_text(order.get("accessories")))
-                        st.write("**Internal notes:**")
-                        st.write(safe_text(order.get("notes")))
 
                     # Status
                     status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
