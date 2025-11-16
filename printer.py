@@ -4,7 +4,7 @@ from datetime import datetime, date
 import io
 import hashlib
 import math
-
+import base64
 from streamlit_gsheets import GSheetsConnection
 
 from reportlab.lib.pagesizes import A4
@@ -23,7 +23,16 @@ st.set_page_config(
     page_icon="🖨️",
     layout="wide",
 )
-
+if "logo_image" not in st.session_state:
+    try:
+        logo_b64 = st.secrets.get("company_info", {}).get("logo_base64", None)
+        if logo_b64:
+            logo_bytes = base64.b64decode(logo_b64)
+            st.session_state["logo_image"] = io.BytesIO(logo_bytes)
+        else:
+            st.session_state["logo_image"] = None
+    except Exception:
+        st.session_state["logo_image"] = None
 
 # ============================================================================
 # AUTHENTICATION
