@@ -19,7 +19,7 @@ from PIL import Image
 # APP CONFIG
 # ============================================================================
 st.set_page_config(
-    page_title="Printer Service CRM",
+    page_title="PRINTHEAD Complete Solutions CRM",
     page_icon="🖨️",
     layout="wide",
 )
@@ -896,7 +896,7 @@ def main():
                         actual_pickup_date = None
 
                     # Editable fields with old values
-                    st.subheader("Repair details (editable)")
+                    st.subheader("Repair details")
 
                     repair_details = st.text_area(
                         "Repairs performed",
