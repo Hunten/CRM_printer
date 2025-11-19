@@ -349,7 +349,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     y_pos -= 3*mm
     c.drawString(x_business, y_pos, f"Tel: {company_info.get('phone','')}")
     y_pos -= 3*mm
-    c.drawString(x_business, y_pos, company_info.get('email',''))
+    c.drawString(x_business, y_pos, f"Email: {company_info.get('email','')}")
     
     # Logo cu calitate maximă - middle - FIX: use logo_image
     logo_x = 85*mm
@@ -399,19 +399,9 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_client, y_pos, "CLIENT")
     y_pos -= 3.5*mm
     c.setFont("Helvetica", 7)
-    c.drawString(x_client, y_pos, "Nume:")
+    c.drawString(x_client, y_pos, f"Nume: {remove_diacritics(safe_text(order.get('client_name','')))}")
     y_pos -= 3*mm
-    client_name = remove_diacritics(safe_text(order.get('client_name','')))
-    if len(client_name) > 20:
-        c.drawString(x_client, y_pos, client_name[:20])
-        y_pos -= 3*mm
-        c.drawString(x_client, y_pos, client_name[20:40])
-    else:
-        c.drawString(x_client, y_pos, client_name)
-    y_pos -= 3*mm
-    c.drawString(x_client, y_pos, "Tel:")
-    y_pos -= 3*mm
-    c.drawString(x_client, y_pos, safe_text(order.get('client_phone','')))
+    c.drawString(x_client, y_pos, f"Tel: {safe_text(order.get('client_phone',''))}")
     
     # Title
     title_y = height-38*mm
@@ -428,29 +418,32 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
 
     # LEFT COLUMN - Equipment details
     x_left = 10*mm
-    y_pos = y_start
+    y_pos = height-50*mm
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(x_left, y_pos, "DETALII ECHIPAMENT:")
-    y_pos -= 3.5*mm
+    c.drawString(10*mm, y_pos, "DETALII ECHIPAMENT:")
+    y_pos -= 5*mm
     c.setFont("Helvetica", 8)
 
     printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
-    if len(printer_info) > 25:
-        printer_info = printer_info[:25] + "..."
-    c.drawString(x_left, y_pos, f"Printer: {printer_info}")
-    y_pos -= 2.5*mm
+    c.drawString(10*mm, y_pos, f"Imprimanta: {printer_info}")
+    y_pos -= 4*mm
 
     serial = safe_text(order.get('printer_serial','N/A'))
-    if len(serial) > 20:
-        serial = serial[:20] + "..."
-    c.drawString(x_left, y_pos, f"Serie: {serial}")
-    y_pos -= 2.5*mm
+    c.drawString(10*mm, y_pos, f"Serie: {serial}")
+    y_pos -= 4*mm
 
-    c.drawString(x_left, y_pos, f"Predare: {safe_text(order.get('date_received',''))}")
+    c.drawString(10*mm, y_pos, f"Data predarii: {safe_text(order.get('date_received',''))}")
+    y_pos -= 4*mm
     if order.get('date_completed'):
-        y_pos -= 2.5*mm
+        y_pos -= 4*mm
         c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('date_picked_up',''))}")
+    accessories = safe_text(order.get('accessories',''))
+    if accessories and accessories.strip():
+        c.drawString(10*mm, y_pos, f"Accesorii: {remove_diacritics(accessories)}")
+        y_pos -= 4*mm
 
+
+    
     # MIDDLE COLUMN - Repairs
     x_middle = 73*mm
     y_pos = y_start
