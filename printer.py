@@ -378,10 +378,10 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     # LEFT COLUMN - Equipment details
     x_left = 10*mm
     y_pos = y_start
-    c.setFont("Helvetica-Bold", 8)
+    c.setFont("Helvetica-Bold", 9)
     c.drawString(x_left, y_pos, "DETALII ECHIPAMENT:")
     y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
+    c.setFont("Helvetica", 8)
     
     printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
     if len(printer_info) > 25:
@@ -403,10 +403,10 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     # MIDDLE COLUMN - Repairs
     x_middle = 73*mm
     y_pos = y_start
-    c.setFont("Helvetica-Bold", 8)
+    c.setFont("Helvetica-Bold", 9)
     c.drawString(x_middle, y_pos, "REPARATII EFECTUATE:")
     y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
+    c.setFont("Helvetica", 8)
     
     repair_text = remove_diacritics(safe_text(order.get('repair_details','N/A')))
     words = repair_text.split()
@@ -431,10 +431,10 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     # RIGHT COLUMN - Parts used
     x_right = 136*mm
     y_pos = y_start
-    c.setFont("Helvetica-Bold", 8)
+    c.setFont("Helvetica-Bold", 9)
     c.drawString(x_right, y_pos, "PIESE UTILIZATE:")
     y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
+    c.setFont("Helvetica", 8)
     
     parts_text = remove_diacritics(safe_text(order.get('parts_used','N/A')))
     words = parts_text.split()
