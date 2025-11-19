@@ -1,4 +1,3 @@
-CRM Printer trimis la Andrei, working good
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
@@ -1089,4 +1088,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()
