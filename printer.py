@@ -27,7 +27,7 @@ st.set_page_config(
 # Load logo from repository - FIX: Keep as BytesIO
 if "logo_image" not in st.session_state:
     try:
-        logo_path = Path("assets/logo.png")
+        logo_path = Path("logo.png")
         if logo_path.exists():
             with open(logo_path, "rb") as f:
                 logo_bytes = f.read()
