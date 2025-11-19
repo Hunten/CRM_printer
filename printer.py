@@ -277,11 +277,14 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(117*mm, sig_y+2*mm, "Semnatura")
 
     #more info
-    c.setFont("Helvetica", 7)
+    c.setFont("Helvetica-Bold", 7)
     c.drawCentredString(105*mm, 18*mm, "Avand in vedere ca dispozitivele din prezenta fisa nu au putut fi testate in momentul preluarii lor, acestea sunt considerate ca fiind nefunctionale.")
     c.setFont("Helvetica", 7)
-    c.drawCentredString(105*mm, 15*mm, "Aveti obligatia ca, la finalizarea reparatiei echipamentului aflat in service, sa va prezentati in termen de 30 de zile de la data anuntarii de catre reprezentantul SC PRINTHEAD COMPLETE SOLUTIONS SRL pentru a ridica echipamentul. In cazul neridicarii echipamentului in intervalul specificat mai sus, ne rezervam dreptul de valorificare a acestuia.")
-
+    c.drawCentredString(105*mm, 15*mm, "Aveti obligatia ca, la finalizarea reparatiei echipamentului aflat in service, sa va prezentati in termen de 30 de zile de la data anuntarii de catre")
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(105*mm, 12*mm, "reprezentantul SC PRINTHEAD COMPLETE SOLUTIONS SRL pentru a ridica echipamentul.In cazul neridicarii echipamentului in intervalul specificat mai sus,")
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(105*mm, 9*mm, "ne rezervam dreptul de valorificare a acestuia")
     
     # Footer
     c.setFont("Helvetica", 6)
