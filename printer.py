@@ -331,13 +331,9 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_client, y_pos, "CLIENT")
     y_pos -= 3.5*mm
     c.setFont("Helvetica", 7)
-    c.drawString(x_client, y_pos, "Nume:")
+    c.drawString(x_client, y_pos, f"Nume: {remove_diacritics(safe_text(order.get('client_name','')))}")
     y_pos -= 3*mm
-    c.drawString(x_client, y_pos, f"Client: {remove_diacritics(safe_text(order.get('client_name','')))}")
-    y_pos -= 3*mm
-    c.drawString(x_client, y_pos, "Tel:")
-    y_pos -= 3*mm
-    c.drawString(x_client, y_pos, safe_text(order.get('client_phone','')))
+    c.drawString(x_client, y_pos, f"Tel: {safe_text(order.get('client_phone',''))}")
     
     # Title
     title_y = height-38*mm
