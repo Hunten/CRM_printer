@@ -334,15 +334,9 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_client, y_pos, "Nume:")
     y_pos -= 3*mm
     client_name = remove_diacritics(safe_text(order.get('client_name','')))
-    if len(client_name) > 20:
-        c.drawString(x_client, y_pos, client_name[:20])
-        y_pos -= 3*mm
-        c.drawString(x_client, y_pos, client_name[20:40])
-    else:
-        c.drawString(x_client, y_pos, client_name)
+    c.drawString(x_client, y_pos, client_name)
     y_pos -= 3*mm
     c.drawString(x_client, y_pos, "Tel:")
-    y_pos -= 3*mm
     c.drawString(x_client, y_pos, safe_text(order.get('client_phone','')))
     
     # Title
@@ -381,7 +375,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_left, y_pos, f"Predare: {safe_text(order.get('date_received',''))}")
     if order.get('date_completed'):
         y_pos -= 2.5*mm
-        c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('date_picked_up',''))}")
+        c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('actual_pickup_date',''))}")
     
     # MIDDLE COLUMN - Repairs
     x_middle = 73*mm
