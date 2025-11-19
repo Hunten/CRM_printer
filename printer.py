@@ -159,7 +159,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c = canvas.Canvas(buffer, pagesize=(width, height))
     
     # Logo cu calitate maximă - FIX: use logo_image not logo_buffer
-       header_y_start = height-10*mm
+    header_y_start = height-10*mm
     x_business = 10*mm
     y_pos = header_y_start
 
