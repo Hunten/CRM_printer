@@ -159,7 +159,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c = canvas.Canvas(buffer, pagesize=(width, height))
     
     # Logo cu calitate maximă - FIX: use logo_image not logo_buffer
-    header_y_start = height-10*mm
+       header_y_start = height-10*mm
     x_business = 10*mm
     y_pos = header_y_start
 
@@ -421,84 +421,6 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     title_y = height-38*mm
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(105*mm, title_y, "BON FINALIZARE REPARATIE")
-    c.setFont("Helvetica-Bold", 10)
-    c.setFillColor(colors.HexColor('#00aa00'))
-    c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
-    c.setFillColor(colors.black)
-    
-    # Three columns section
-    y_start = height-50*mm
-    col_width = 63*mm
-    
-    # LEFT COLUMN
-    x_left = 10*mm
-    y_pos = y_start
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(x_left, y_pos, "DETALII ECHIPAMENT:")
-    y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
-    
-    printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
-    if len(printer_info) > 25:
-        printer_info = printer_info[:25] + "..."
-    c.drawString(x_left, y_pos, printer_info)
-    y_pos -= 2.5*mm
-    
-    serial = safe_text(order.get('printer_serial','N/A'))
-    if len(serial) > 20:
-        serial = serial[:20] + "..."
-    c.drawString(x_left, y_pos, f"Serie: {serial}")
-    y_pos -= 2.5*mm
-    
-    c.drawString(x_left, y_pos, f"Predare: {safe_text(order.get('date_received',''))}")
-    if order.get('date_completed'):
-        y_pos -= 2.5*mm
-        c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('date_completed',''))}")
-    
-    # MIDDLE COLUMN
-    x_middle = 73*mm
-    y_pos = y_start
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(x_middle, y_pos, "REPARATII EFECTUATE:")
-    y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
-    
-    repair_text = remove_diacritics(safe_text(order.get('repair_details','N/A')))
-    words = repair_text.split()
-    line = ""
-    line_count = 0
-    max_lines = 5
-    for word in words:
-        test_line = line + word + " "
-        if c.stringWidth(test_line, "Helvetica", 7) < (col_width-2*mm):
-            line = test_line
-        else:
-            if line_count < max_lines:
-                c.drawString(x_middle, y_pos, line.strip())
-                y_pos -= 2.5*mm
-                line_count += 1
-                line = word + " "
-            else:
-                break
-    if line and line_count < max_lines:
-        c.drawString(x_middle, y_pos, line.strip())
-    
-    # Client info - right side
-    c.setFillColor(colors.black)
-    x_client = 155*mm
-    y_pos = header_y_start
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(x_client, y_pos, "CLIENT")
-    y_pos -= 3.5*mm
-    c.setFont("Helvetica", 7)
-    c.drawString(x_client, y_pos, f"Nume: {remove_diacritics(safe_text(order.get('client_name','')))}")
-    y_pos -= 3*mm
-    c.drawString(x_client, y_pos, f"Tel: {safe_text(order.get('client_phone',''))}")
-
-    # Title
-    title_y = height-38*mm
-    c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(105*mm, title_y, "DOVADA RIDICARE ECHIPAMENT DIN SERVICE")
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(colors.HexColor('#00aa00'))
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
