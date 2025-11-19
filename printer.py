@@ -36,11 +36,15 @@ if "logo_image" not in st.session_state:
 
 # Initialize active tab in session state
 if "active_tab" not in st.session_state:
-    st.session_state["active_tab"] = 0  # Default to first tab
+    st.session_state["active_tab"] = 0
 
 # Initialize selected order for tab2
 if "selected_order_for_update" not in st.session_state:
     st.session_state["selected_order_for_update"] = None
+
+# Track previous order to detect changes
+if "previous_selected_order" not in st.session_state:
+    st.session_state["previous_selected_order"] = None
 
 # ============================================================================
 # AUTHENTICATION
@@ -807,7 +811,6 @@ def main():
                 logo = st.session_state.get("logo_image", None)
                 pdf_buffer = generate_initial_receipt_pdf(order, st.session_state["company_info"], logo)
                 
-                # Download button with callback to clear everything
                 if st.download_button(
                     "📄 Download Initial Receipt",
                     pdf_buffer,
@@ -817,7 +820,6 @@ def main():
                     use_container_width=True,
                     key="dl_new_init",
                 ):
-                    # Clear state after download
                     st.session_state["last_created_order"] = None
                     st.session_state["pdf_downloaded"] = True
                     st.rerun()
@@ -835,7 +837,6 @@ def main():
             col3.metric("✅ Ready", len(df[df["status"] == "Ready for Pickup"]))
             col4.metric("🎉 Completed", len(df[df["status"] == "Completed"]))
 
-            # Make the dataframe clickable using selection mode
             st.markdown("**Click on a row to edit that order:**")
             
             event = st.dataframe(
@@ -846,13 +847,12 @@ def main():
                 key="orders_table"
             )
             
-            # Check if a row was selected
             if event and "selection" in event and event["selection"]["rows"]:
                 selected_idx = event["selection"]["rows"][0]
                 selected_order_id = df.iloc[selected_idx]["order_id"]
                 
-                # Set the selected order and switch to update tab
                 st.session_state["selected_order_for_update"] = selected_order_id
+                st.session_state["previous_selected_order"] = None  # Reset to force reload
                 st.session_state["active_tab"] = 2
                 st.rerun()
 
@@ -875,13 +875,11 @@ def main():
     elif active_tab == 2:
         st.header("Update Service Order")
         
-        # Force fresh data read with ttl=0 to get latest values
-        df = crm.list_orders_df()
+        df = df_all_orders
 
         if not df.empty:
             available_orders = df["order_id"].tolist()
             
-            # Use the pre-selected order if coming from tab1
             default_idx = 0
             if st.session_state["selected_order_for_update"] in available_orders:
                 default_idx = available_orders.index(st.session_state["selected_order_for_update"])
@@ -898,8 +896,13 @@ def main():
                 on_change=on_order_select
             )
 
+            # DETECT ORDER CHANGE AND FORCE RERUN
+            if st.session_state["previous_selected_order"] != selected_order_id:
+                st.session_state["previous_selected_order"] = selected_order_id
+                st.rerun()
+
             if selected_order_id:
-                # Fetch fresh data from spreadsheet
+                # Fetch FRESH data from spreadsheet with NO caching
                 df_fresh = crm._read_df(raw=True, ttl=0)
                 order_row = df_fresh[df_fresh["order_id"] == selected_order_id]
                 
@@ -924,7 +927,7 @@ def main():
 
                     st.divider()
 
-                    # Status - fetch current value from spreadsheet
+                    # Status with unique key per order
                     status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
                     current_status = safe_text(order.get("status")) or "Received"
                     if current_status not in status_options:
@@ -935,51 +938,51 @@ def main():
                         "Status",
                         status_options,
                         index=status_index,
-                        key="update_status",
+                        key=f"update_status_{selected_order_id}",
                     )
 
                     if new_status == "Completed":
                         actual_pickup_date = st.date_input(
                             "Actual Pickup Date",
                             value=date.today(),
-                            key="update_pickup_date",
+                            key=f"update_pickup_date_{selected_order_id}",
                         )
                     else:
                         actual_pickup_date = None
 
-                    # Editable fields - FETCH FROM SPREADSHEET
+                    # Editable fields with UNIQUE KEYS per order
                     st.subheader("Repair details")
 
                     repair_details = st.text_area(
                         "Repairs performed",
                         value=safe_text(order.get("repair_details")),
                         height=100,
-                        key="update_repair_details",
+                        key=f"update_repair_details_{selected_order_id}",
                         help="This field is loaded from the spreadsheet. You can edit or add to existing text."
                     )
 
                     parts_used = st.text_input(
                         "Parts used",
                         value=safe_text(order.get("parts_used")),
-                        key="update_parts_used",
+                        key=f"update_parts_used_{selected_order_id}",
                         help="This field is loaded from the spreadsheet. You can edit or add to existing text."
                     )
 
                     technician = st.text_input(
                         "Technician",
                         value=safe_text(order.get("technician")),
-                        key="update_technician",
+                        key=f"update_technician_{selected_order_id}",
                         help="This field is loaded from the spreadsheet."
                     )
 
-                    # Costs - FETCH FROM SPREADSHEET
+                    # Costs with UNIQUE KEYS
                     colc1, colc2, colc3 = st.columns(3)
                     labor_cost = colc1.number_input(
                         "Labor cost (RON)",
                         value=safe_float(order.get("labor_cost")),
                         min_value=0.0,
                         step=10.0,
-                        key="update_labor_cost",
+                        key=f"update_labor_cost_{selected_order_id}",
                         help="Loaded from spreadsheet"
                     )
                     parts_cost = colc2.number_input(
@@ -987,13 +990,13 @@ def main():
                         value=safe_float(order.get("parts_cost")),
                         min_value=0.0,
                         step=10.0,
-                        key="update_parts_cost",
+                        key=f"update_parts_cost_{selected_order_id}",
                         help="Loaded from spreadsheet"
                     )
                     colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
 
                     # Update button
-                    if st.button("💾 Update Order", type="primary", key="update_order_btn"):
+                    if st.button("💾 Update Order", type="primary", key=f"update_order_btn_{selected_order_id}"):
                         updates = {
                             "status": new_status,
                             "repair_details": repair_details,
