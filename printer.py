@@ -207,7 +207,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     # Title
     title_y = height-38*mm
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(105*mm, title_y, "DOVADA PREDARE ECHIMAPENT IN SERVICE")
+    c.drawCentredString(105*mm, title_y, "DOVADA PREDARE ECHIPAMENT IN SERVICE")
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(colors.HexColor('#E5283A'))
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
@@ -365,7 +365,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     # Title
     title_y = height-38*mm
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(105*mm, title_y, "DOVADA RIDICARE ECHIMAPENT DIN SERVICE")
+    c.drawCentredString(105*mm, title_y, "DOVADA RIDICARE ECHIPAMENT DIN SERVICE")
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(colors.HexColor('#00aa00'))
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
