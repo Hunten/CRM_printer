@@ -276,6 +276,10 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(117*mm, sig_y+sig_height-7*mm, "Am luat la cunostinta")
     c.drawString(117*mm, sig_y+2*mm, "Semnatura")
 
+    #more info
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(105*mm, 18*mm, "Având în vedere că dispozitivele din prezenta fișă nu au putut fi testate în momentul preluării lor, acestea sunt considerate ca fiind nefuncționale.")
+
     
     # Footer
     c.setFont("Helvetica", 6)
