@@ -23,15 +23,18 @@ st.set_page_config(
     page_icon="🖨️",
     layout="wide",
 )
+# Load logo from repository
 if "logo_image" not in st.session_state:
     try:
-        logo_b64 = st.secrets.get("company_info", {}).get("logo_base64", None)
-        if logo_b64:
-            logo_bytes = base64.b64decode(logo_b64)
+        logo_path = Path("assets/logo.png")
+        if logo_path.exists():
+            with open(logo_path, "rb") as f:
+                logo_bytes = f.read()
             st.session_state["logo_image"] = io.BytesIO(logo_bytes)
         else:
             st.session_state["logo_image"] = None
-    except Exception:
+    except Exception as e:
+        st.warning(f"Logo not found: {e}")
         st.session_state["logo_image"] = None
 
 # Initialize active tab in session state
@@ -171,26 +174,44 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     logo_y = header_y_start-20*mm
     logo_width = 40*mm
     logo_height = 25*mm
-    if logo_image:
+    # Logo cu calitate maximă
+    if logo_buffer:
         try:
-            logo = Image.open(logo_image)
-            logo.thumbnail((150,95), Image.Resampling.LANCZOS)
-            logo_buffer = io.BytesIO()
-            logo.save(logo_buffer, format='PNG')
             logo_buffer.seek(0)
-            c.drawImage(ImageReader(logo_buffer), logo_x, logo_y, width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
-        except:
+            img = Image.open(logo_buffer)
+            
+            # Calculează dimensiuni pentru PDF
+            target_width_mm = 40
+            aspect_ratio = img.height / img.width
+            target_height_mm = target_width_mm * aspect_ratio
+            
+            if target_height_mm > 25:
+                target_height_mm = 25
+                target_width_mm = target_height_mm / aspect_ratio
+            
+            logo_buffer.seek(0)
+            c.drawImage(
+                ImageReader(logo_buffer), 
+                10*mm, 
+                height-30*mm, 
+                width=target_width_mm*mm, 
+                height=target_height_mm*mm, 
+                preserveAspectRatio=True, 
+                mask='auto'
+            )
+        except Exception as e:
+            # Fallback placeholder
             c.setFillColor(colors.HexColor('#f0f0f0'))
-            c.rect(logo_x, logo_y, logo_width, logo_height, fill=1, stroke=1)
+            c.rect(10*mm, height-30*mm, 40*mm, 25*mm, fill=1, stroke=1)
             c.setFillColor(colors.black)
             c.setFont("Helvetica-Bold", 10)
-            c.drawCentredString(logo_x+(logo_width/2), logo_y+(logo_height/2), "[LOGO]")
+            c.drawCentredString(10*mm+20*mm, height-17.5*mm, "[LOGO]")
     else:
         c.setFillColor(colors.HexColor('#f0f0f0'))
-        c.rect(logo_x, logo_y, logo_width, logo_height, fill=1, stroke=1)
+        c.rect(10*mm, height-30*mm, 40*mm, 25*mm, fill=1, stroke=1)
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 10)
-        c.drawCentredString(logo_x+(logo_width/2), logo_y+(logo_height/2), "[LOGO]")
+        c.drawCentredString(10*mm+20*mm, height-17.5*mm, "[LOGO]")
     
     # Client info - right side
     c.setFillColor(colors.black)
