@@ -178,17 +178,15 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     y_pos -= 3*mm
     c.drawString(x_business, y_pos, f"Email: {company_info.get('email','')}")
 
-    # Logo - middle
+    # Logo cu calitate maximă - middle - FIX: use logo_image
     logo_x = 85*mm
     logo_y = header_y_start-20*mm
-    logo_width = 40*mm
-    logo_height = 25*mm
+    
     if logo_image:
         try:
-            logo_image.seek(0)  # Reset buffer position
+            logo_image.seek(0)
             img = Image.open(logo_image)
             
-            # Calculează dimensiuni pentru PDF
             target_width_mm = 40
             aspect_ratio = img.height / img.width
             target_height_mm = target_width_mm * aspect_ratio
@@ -197,30 +195,28 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
                 target_height_mm = 25
                 target_width_mm = target_height_mm / aspect_ratio
             
-            logo_image.seek(0)  # Reset again before drawing
+            logo_image.seek(0)
             c.drawImage(
                 ImageReader(logo_image), 
-                10*mm, 
-                height-30*mm, 
+                logo_x, 
+                logo_y, 
                 width=target_width_mm*mm, 
                 height=target_height_mm*mm, 
                 preserveAspectRatio=True, 
                 mask='auto'
             )
-        except Exception as e:
-            st.warning(f"Logo render error: {e}")
-            # Fallback placeholder
+        except Exception:
             c.setFillColor(colors.HexColor('#f0f0f0'))
-            c.rect(10*mm, height-30*mm, 40*mm, 25*mm, fill=1, stroke=1)
+            c.rect(logo_x, logo_y, 40*mm, 25*mm, fill=1, stroke=1)
             c.setFillColor(colors.black)
             c.setFont("Helvetica-Bold", 10)
-            c.drawCentredString(10*mm+20*mm, height-17.5*mm, "[LOGO]")
+            c.drawCentredString(logo_x+20*mm, logo_y+12.5*mm, "[LOGO]")
     else:
         c.setFillColor(colors.HexColor('#f0f0f0'))
-        c.rect(10*mm, height-30*mm, 40*mm, 25*mm, fill=1, stroke=1)
+        c.rect(logo_x, logo_y, 40*mm, 25*mm, fill=1, stroke=1)
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 10)
-        c.drawCentredString(10*mm+20*mm, height-17.5*mm, "[LOGO]")
+        c.drawCentredString(logo_x+20*mm, logo_y+12.5*mm, "[LOGO]")
     
     # Client info - right side
     c.setFillColor(colors.black)
@@ -420,7 +416,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     # Title
     title_y = height-38*mm
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(105*mm, title_y, "BON FINALIZARE REPARATIE")
+    c.drawCentredString(105*mm, title_y, "DOVADA RIDICARE ECHIPAMENT DIN SERVICE")
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(colors.HexColor('#00aa00'))
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
