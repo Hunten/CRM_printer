@@ -38,6 +38,10 @@ if "logo_image" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = 0  # Default to first tab
 
+# Initialize selected order for tab2
+if "selected_order_for_update" not in st.session_state:
+    st.session_state["selected_order_for_update"] = None
+
 # ============================================================================
 # AUTHENTICATION
 # ============================================================================
@@ -116,9 +120,6 @@ def safe_float(value: object, default: float = 0.0) -> float:
         return float(value)
     except Exception:
         return default
-
-# [Keep all your existing helper functions: get_sheets_connection, generate_initial_receipt_pdf, 
-# generate_completion_receipt_pdf, and PrinterServiceCRM class exactly as they are]
 
 # ============================================================================
 # GOOGLE SHEETS CONNECTION
@@ -200,21 +201,17 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     y_pos -= 5*mm
     c.setFont("Helvetica", 8)
     
-    # Printer brand and model - use safe_text()
     printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
     c.drawString(10*mm, y_pos, f"Imprimanta: {printer_info}")
     y_pos -= 4*mm
     
-    # Serial - use safe_text()
     serial = safe_text(order.get('printer_serial','N/A'))
     c.drawString(10*mm, y_pos, f"Serie: {serial}")
     y_pos -= 4*mm
     
-    # Date received - use safe_text()
     c.drawString(10*mm, y_pos, f"Data predarii: {safe_text(order.get('date_received',''))}")
     y_pos -= 4*mm
     
-    # Accessories - use safe_text()
     accessories = safe_text(order.get('accessories',''))
     if accessories and accessories.strip():
         c.drawString(10*mm, y_pos, f"Accesorii: {remove_diacritics(accessories)}")
@@ -371,7 +368,6 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_left, y_pos, printer_info)
     y_pos -= 2.5*mm
     
-    # Serial - FIX HERE: use safe_text()
     serial = safe_text(order.get('printer_serial','N/A'))
     if len(serial) > 20:
         serial = serial[:20] + "..."
@@ -664,13 +660,11 @@ def main():
     st.title("🖨️ Printer Service CRM")
     st.markdown("### Professional Printer Service Management System")
 
-    # Load company info from Secrets (NOT from session state default)
+    # Load company info from Secrets
     if "company_info" not in st.session_state:
         try:
-            # Citim din secrets
             st.session_state["company_info"] = dict(st.secrets.get("company_info", {}))
         except Exception:
-            # Fallback doar dacă secrets nu sunt setate
             st.session_state["company_info"] = {
                 "company_name": "Company Name",
                 "company_address": "Address",
@@ -684,6 +678,8 @@ def main():
         st.session_state["last_created_order"] = None
     if "logo_image" not in st.session_state:
         st.session_state["logo_image"] = None
+    if "pdf_downloaded" not in st.session_state:
+        st.session_state["pdf_downloaded"] = False
 
     # Sidebar
     with st.sidebar:
@@ -736,23 +732,9 @@ def main():
     # Read all orders ONCE per run to minimize API calls
     df_all_orders = crm.list_orders_df()
 
-    # Create tabs with on_change callback to track active tab
-    def set_tab_0():
-        st.session_state["active_tab"] = 0
-    
-    def set_tab_1():
-        st.session_state["active_tab"] = 1
-    
-    def set_tab_2():
-        st.session_state["active_tab"] = 2
-    
-    def set_tab_3():
-        st.session_state["active_tab"] = 3
-
-    # Create tab navigation
+    # Create tab navigation with buttons
     tab_titles = ["📥 New Order", "📋 All Orders", "✏️ Update Order", "📊 Reports"]
     
-    # Display tabs with active state tracking
     cols = st.columns(4)
     for idx, (col, title) in enumerate(zip(cols, tab_titles)):
         with col:
@@ -763,7 +745,6 @@ def main():
 
     st.divider()
 
-    # Display content based on active tab
     active_tab = st.session_state["active_tab"]
 
     # ========================================================================
@@ -771,65 +752,74 @@ def main():
     # ========================================================================
     if active_tab == 0:
         st.header("Create New Service Order")
-        with st.form(key="new_order_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("Client Information")
-                client_name = st.text_input("Name *")
-                client_phone = st.text_input("Phone *")
-                client_email = st.text_input("Email")
-            with col2:
-                st.subheader("Printer Information")
-                printer_brand = st.text_input("Brand *")
-                printer_model = st.text_input("Model *")
-                printer_serial = st.text_input("Serial Number")
+        
+        # Show form only if no order was just created
+        if not st.session_state["last_created_order"] or st.session_state["pdf_downloaded"]:
+            with st.form(key="new_order_form", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("Client Information")
+                    client_name = st.text_input("Name *")
+                    client_phone = st.text_input("Phone *")
+                    client_email = st.text_input("Email")
+                with col2:
+                    st.subheader("Printer Information")
+                    printer_brand = st.text_input("Brand *")
+                    printer_model = st.text_input("Model *")
+                    printer_serial = st.text_input("Serial Number")
 
-            col3, col4 = st.columns(2)
-            with col3:
-                date_received = st.date_input("Date Received *", value=date.today())
-            with col4:
-                date_pickup = st.date_input("Scheduled Pickup (optional)", value=None)
+                col3, col4 = st.columns(2)
+                with col3:
+                    date_received = st.date_input("Date Received *", value=date.today())
+                with col4:
+                    date_pickup = st.date_input("Scheduled Pickup (optional)", value=None)
 
-            issue_description = st.text_area("Issue Description *", height=100)
-            accessories = st.text_input("Accessories (cables, cartridges, etc.)")
-            notes = st.text_area("Additional Notes", height=60)
+                issue_description = st.text_area("Issue Description *", height=100)
+                accessories = st.text_input("Accessories (cables, cartridges, etc.)")
+                notes = st.text_area("Additional Notes", height=60)
 
-            submit = st.form_submit_button("🎫 Create Order", type="primary", use_container_width=True)
+                submit = st.form_submit_button("🎫 Create Order", type="primary", use_container_width=True)
 
-            if submit:
-                if client_name and client_phone and printer_brand and printer_model and issue_description:
-                    order_id = crm.create_service_order(
-                        client_name, client_phone, client_email, printer_brand, printer_model,
-                        printer_serial, issue_description, accessories, notes, date_received, date_pickup
-                    )
-                    if order_id:
-                        st.session_state["last_created_order"] = order_id
-                        st.success(f"✅ Order Created: **{order_id}**")
-                        st.balloons()
-                else:
-                    st.error("❌ Please fill in all required fields (*)")
+                if submit:
+                    if client_name and client_phone and printer_brand and printer_model and issue_description:
+                        order_id = crm.create_service_order(
+                            client_name, client_phone, client_email, printer_brand, printer_model,
+                            printer_serial, issue_description, accessories, notes, date_received, date_pickup
+                        )
+                        if order_id:
+                            st.session_state["last_created_order"] = order_id
+                            st.session_state["pdf_downloaded"] = False
+                            st.success(f"✅ Order Created: **{order_id}**")
+                            st.balloons()
+                            st.rerun()
+                    else:
+                        st.error("❌ Please fill in all required fields (*)")
 
-        if st.session_state["last_created_order"]:
-            # Re-read to get the order we just created
+        # Show download section after order creation
+        if st.session_state["last_created_order"] and not st.session_state["pdf_downloaded"]:
             df_fresh = crm.list_orders_df()
             order_row = df_fresh[df_fresh["order_id"] == st.session_state["last_created_order"]]
             if not order_row.empty:
                 order = order_row.iloc[0].to_dict()
                 st.divider()
+                st.success(f"✅ Order Created: **{order['order_id']}**")
                 st.subheader("📄 Download Receipt")
                 logo = st.session_state.get("logo_image", None)
                 pdf_buffer = generate_initial_receipt_pdf(order, st.session_state["company_info"], logo)
-                st.download_button(
+                
+                # Download button with callback to clear everything
+                if st.download_button(
                     "📄 Download Initial Receipt",
                     pdf_buffer,
                     f"Initial_{order['order_id']}.pdf",
                     "application/pdf",
-                    type="secondary",
+                    type="primary",
                     use_container_width=True,
                     key="dl_new_init",
-                )
-                if st.button("✅ Done", use_container_width=True, key="done_new_order"):
+                ):
+                    # Clear state after download
                     st.session_state["last_created_order"] = None
+                    st.session_state["pdf_downloaded"] = True
                     st.rerun()
 
     # ========================================================================
@@ -845,10 +835,26 @@ def main():
             col3.metric("✅ Ready", len(df[df["status"] == "Ready for Pickup"]))
             col4.metric("🎉 Completed", len(df[df["status"] == "Completed"]))
 
-            st.dataframe(
+            # Make the dataframe clickable using selection mode
+            st.markdown("**Click on a row to edit that order:**")
+            
+            event = st.dataframe(
                 df[["order_id", "client_name", "printer_brand", "date_received", "status", "total_cost"]],
                 use_container_width=True,
+                selection_mode="single-row",
+                on_select="rerun",
+                key="orders_table"
             )
+            
+            # Check if a row was selected
+            if event and "selection" in event and event["selection"]["rows"]:
+                selected_idx = event["selection"]["rows"][0]
+                selected_order_id = df.iloc[selected_idx]["order_id"]
+                
+                # Set the selected order and switch to update tab
+                st.session_state["selected_order_for_update"] = selected_order_id
+                st.session_state["active_tab"] = 2
+                st.rerun()
 
             csv = df.to_csv(index=False)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -868,26 +874,35 @@ def main():
     # ========================================================================
     elif active_tab == 2:
         st.header("Update Service Order")
-        df = df_all_orders
+        
+        # Force fresh data read with ttl=0 to get latest values
+        df = crm.list_orders_df()
 
         if not df.empty:
-            # Selectează dintr-o listă
             available_orders = df["order_id"].tolist()
             
-            # Callback to stay on tab 2
+            # Use the pre-selected order if coming from tab1
+            default_idx = 0
+            if st.session_state["selected_order_for_update"] in available_orders:
+                default_idx = available_orders.index(st.session_state["selected_order_for_update"])
+            
             def on_order_select():
                 st.session_state["active_tab"] = 2
             
             selected_order_id = st.selectbox(
                 "Select Order",
                 available_orders,
+                index=default_idx,
                 key="update_order_select",
                 label_visibility="collapsed",
                 on_change=on_order_select
             )
 
             if selected_order_id:
-                order_row = df[df["order_id"] == selected_order_id]
+                # Fetch fresh data from spreadsheet
+                df_fresh = crm._read_df(raw=True, ttl=0)
+                order_row = df_fresh[df_fresh["order_id"] == selected_order_id]
+                
                 if order_row.empty:
                     st.error("❌ Order not found in current data. Try refreshing the page.")
                 else:
@@ -909,7 +924,7 @@ def main():
 
                     st.divider()
 
-                    # Status
+                    # Status - fetch current value from spreadsheet
                     status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
                     current_status = safe_text(order.get("status")) or "Received"
                     if current_status not in status_options:
@@ -932,7 +947,7 @@ def main():
                     else:
                         actual_pickup_date = None
 
-                    # Editable fields with old values
+                    # Editable fields - FETCH FROM SPREADSHEET
                     st.subheader("Repair details")
 
                     repair_details = st.text_area(
@@ -940,21 +955,24 @@ def main():
                         value=safe_text(order.get("repair_details")),
                         height=100,
                         key="update_repair_details",
+                        help="This field is loaded from the spreadsheet. You can edit or add to existing text."
                     )
 
                     parts_used = st.text_input(
                         "Parts used",
                         value=safe_text(order.get("parts_used")),
                         key="update_parts_used",
+                        help="This field is loaded from the spreadsheet. You can edit or add to existing text."
                     )
 
                     technician = st.text_input(
                         "Technician",
                         value=safe_text(order.get("technician")),
                         key="update_technician",
+                        help="This field is loaded from the spreadsheet."
                     )
 
-                    # Costs
+                    # Costs - FETCH FROM SPREADSHEET
                     colc1, colc2, colc3 = st.columns(3)
                     labor_cost = colc1.number_input(
                         "Labor cost (RON)",
@@ -962,6 +980,7 @@ def main():
                         min_value=0.0,
                         step=10.0,
                         key="update_labor_cost",
+                        help="Loaded from spreadsheet"
                     )
                     parts_cost = colc2.number_input(
                         "Parts cost (RON)",
@@ -969,6 +988,7 @@ def main():
                         min_value=0.0,
                         step=10.0,
                         key="update_parts_cost",
+                        help="Loaded from spreadsheet"
                     )
                     colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
 
@@ -994,7 +1014,7 @@ def main():
 
                         if crm.update_order(selected_order_id, **updates):
                             st.success("✅ Order updated successfully!")
-                            st.session_state["active_tab"] = 2  # Ensure we stay on tab 2
+                            st.session_state["active_tab"] = 2
                             st.rerun()
 
                     # PDF downloads
