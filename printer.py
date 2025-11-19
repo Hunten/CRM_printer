@@ -212,9 +212,9 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c.setFillColor(colors.HexColor('#00aa00'))
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
     c.setFillColor(colors.black)
-    
+  
     # Equipment details
-    y_pos = height-72*mm
+    y_pos = height-50*mm
     c.setFont("Helvetica-Bold", 9)
     c.drawString(10*mm, y_pos, "DETALII ECHIPAMENT:")
     y_pos -= 5*mm
@@ -258,9 +258,9 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     if line:
         text_object.textLine(line)
     c.drawText(text_object)
-    
+
     # Signature boxes
-    y_pos = 25*mm
+    y_pos = 22*mm
     c.rect(10*mm, y_pos, 85*mm, 20*mm)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(12*mm, y_pos+17*mm, "OPERATOR SERVICE")
@@ -510,7 +510,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     
     # Footer
     c.setFont("Helvetica", 6)
-    c.drawCentredString(105*mm, 3*mm, "Acest document constituie dovada finalizarii reparatiei.")
+    c.drawCentredString(105*mm, 3*mm, "Acest document constituie dovada ridicarii echipamentului din service.")
     c.setDash(3, 3)
     c.line(5*mm, 1*mm, 205*mm, 1*mm)
     
