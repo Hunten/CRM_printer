@@ -334,12 +334,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_client, y_pos, "Nume:")
     y_pos -= 3*mm
     client_name = remove_diacritics(safe_text(order.get('client_name','')))
-    if len(client_name) > 20:
-        c.drawString(x_client, y_pos, client_name[:20])
-        y_pos -= 3*mm
-        c.drawString(x_client, y_pos, client_name[20:40])
-    else:
-        c.drawString(x_client, y_pos, client_name)
+    c.drawString(x_client, y_pos, f"Client: {client_name,''}")
     y_pos -= 3*mm
     c.drawString(x_client, y_pos, "Tel:")
     y_pos -= 3*mm
