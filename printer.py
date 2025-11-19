@@ -338,7 +338,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     # Title
     title_y = height-38*mm
     c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(105*mm, title_y, "BON FINALIZARE REPARATIE")
+    c.drawCentredString(105*mm, title_y, "DOVADA RIDICARE ECHIMAPENT DIN SERVICE")
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(colors.HexColor('#00aa00'))
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
@@ -484,18 +484,18 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.setFont("Helvetica-Bold", 8)
     c.drawString(12*mm, sig_y+sig_height-3*mm, "OPERATOR SERVICE")
     c.setFont("Helvetica", 7)
-    c.drawString(12*mm, sig_y+2*mm, "Semnatura si Stampila")
+    c.drawString(12*mm, sig_y+2*mm, "Semnatura operator service")
     
     c.rect(115*mm, sig_y, 85*mm, sig_height)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(117*mm, sig_y+sig_height-3*mm, "CLIENT")
     c.setFont("Helvetica", 7)
-    c.drawString(117*mm, sig_y+sig_height-7*mm, f"Nume: {remove_diacritics(safe_text(order.get('client_name','')))}")
-    c.drawString(117*mm, sig_y+2*mm, "Semnatura")
+    c.drawString(117*mm, sig_y+sig_height-7*mm, "Am luat la cunostinta")
+    c.drawString(117*mm, sig_y+2*mm, "Semnatura client")
     
     # Footer
     c.setFont("Helvetica", 6)
-    c.drawCentredString(105*mm, 3*mm, "Acest document constituie factura si dovada finalizarii reparatiei.")
+    c.drawCentredString(105*mm, 3*mm, "Acest document constituie dovada finalizarii reparatiei.")
     c.setDash(3, 3)
     c.line(5*mm, 1*mm, 205*mm, 1*mm)
     
