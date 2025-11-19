@@ -433,16 +433,13 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     y_pos -= 4*mm
 
     c.drawString(10*mm, y_pos, f"Data predarii: {safe_text(order.get('date_received',''))}")
-    y_pos -= 4*mm
     if order.get('date_completed'):
         y_pos -= 4*mm
         c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('date_picked_up',''))}")
     accessories = safe_text(order.get('accessories',''))
     if accessories and accessories.strip():
-        c.drawString(10*mm, y_pos, f"Accesorii: {remove_diacritics(accessories)}")
         y_pos -= 4*mm
-
-
+        c.drawString(10*mm, y_pos, f"Accesorii: {remove_diacritics(accessories)}")
     
     # MIDDLE COLUMN - Repairs
     x_middle = 73*mm
