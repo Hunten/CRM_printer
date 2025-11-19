@@ -34,6 +34,10 @@ if "logo_image" not in st.session_state:
     except Exception:
         st.session_state["logo_image"] = None
 
+# Initialize active tab in session state
+if "active_tab" not in st.session_state:
+    st.session_state["active_tab"] = 0  # Default to first tab
+
 # ============================================================================
 # AUTHENTICATION
 # ============================================================================
@@ -113,6 +117,8 @@ def safe_float(value: object, default: float = 0.0) -> float:
     except Exception:
         return default
 
+# [Keep all your existing helper functions: get_sheets_connection, generate_initial_receipt_pdf, 
+# generate_completion_receipt_pdf, and PrinterServiceCRM class exactly as they are]
 
 # ============================================================================
 # GOOGLE SHEETS CONNECTION
@@ -453,6 +459,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Descriere")
     c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, "Suma (RON)")
     c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
+    
     y_cost -= row_height
     
     # Labor row
@@ -505,8 +512,6 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.save()
     buffer.seek(0)
     return buffer
-
-
 
 # ============================================================================
 # CRM CLASS - GOOGLE SHEETS BACKEND
@@ -731,12 +736,40 @@ def main():
     # Read all orders ONCE per run to minimize API calls
     df_all_orders = crm.list_orders_df()
 
-    tab1, tab2, tab3, tab4 = st.tabs(["📥 New Order", "📋 All Orders", "✏️ Update Order", "📊 Reports"])
+    # Create tabs with on_change callback to track active tab
+    def set_tab_0():
+        st.session_state["active_tab"] = 0
+    
+    def set_tab_1():
+        st.session_state["active_tab"] = 1
+    
+    def set_tab_2():
+        st.session_state["active_tab"] = 2
+    
+    def set_tab_3():
+        st.session_state["active_tab"] = 3
+
+    # Create tab navigation
+    tab_titles = ["📥 New Order", "📋 All Orders", "✏️ Update Order", "📊 Reports"]
+    
+    # Display tabs with active state tracking
+    cols = st.columns(4)
+    for idx, (col, title) in enumerate(zip(cols, tab_titles)):
+        with col:
+            if st.button(title, key=f"tab_btn_{idx}", use_container_width=True, 
+                        type="primary" if st.session_state["active_tab"] == idx else "secondary"):
+                st.session_state["active_tab"] = idx
+                st.rerun()
+
+    st.divider()
+
+    # Display content based on active tab
+    active_tab = st.session_state["active_tab"]
 
     # ========================================================================
-    # TAB 1: NEW ORDER
+    # TAB 0: NEW ORDER
     # ========================================================================
-    with tab1:
+    if active_tab == 0:
         st.header("Create New Service Order")
         with st.form(key="new_order_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -800,9 +833,9 @@ def main():
                     st.rerun()
 
     # ========================================================================
-    # TAB 2: ALL ORDERS
+    # TAB 1: ALL ORDERS
     # ========================================================================
-    with tab2:
+    elif active_tab == 1:
         st.header("All Service Orders")
         df = df_all_orders
         if not df.empty:
@@ -831,22 +864,27 @@ def main():
             st.info("📝 No orders yet. Create your first order in the 'New Order' tab!")
 
     # ========================================================================
-    # TAB 3: UPDATE ORDER
+    # TAB 2: UPDATE ORDER
     # ========================================================================
-    with tab3:
+    elif active_tab == 2:
         st.header("Update Service Order")
         df = df_all_orders
 
         if not df.empty:
             # Selectează dintr-o listă
             available_orders = df["order_id"].tolist()
+            
+            # Callback to stay on tab 2
+            def on_order_select():
+                st.session_state["active_tab"] = 2
+            
             selected_order_id = st.selectbox(
                 "Select Order",
                 available_orders,
                 key="update_order_select",
-                label_visibility="collapsed",  # Ascunde label-ul
+                label_visibility="collapsed",
+                on_change=on_order_select
             )
-
 
             if selected_order_id:
                 order_row = df[df["order_id"] == selected_order_id]
@@ -870,7 +908,6 @@ def main():
                         st.write(f"**Internal notes:** {safe_text(order.get('notes'))}")
 
                     st.divider()
-
 
                     # Status
                     status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
@@ -957,6 +994,7 @@ def main():
 
                         if crm.update_order(selected_order_id, **updates):
                             st.success("✅ Order updated successfully!")
+                            st.session_state["active_tab"] = 2  # Ensure we stay on tab 2
                             st.rerun()
 
                     # PDF downloads
@@ -990,9 +1028,9 @@ def main():
             st.info("📝 No orders yet. Create your first order in the 'New Order' tab!")
 
     # ========================================================================
-    # TAB 4: REPORTS
+    # TAB 3: REPORTS
     # ========================================================================
-    with tab4:
+    elif active_tab == 3:
         st.header("Reports & Analytics")
         df = df_all_orders
         if not df.empty:
