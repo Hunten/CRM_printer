@@ -369,7 +369,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
     if len(printer_info) > 25:
         printer_info = printer_info[:25] + "..."
-    c.drawString(x_left, y_pos, printer_info)
+    c.drawString(x_left, y_pos, f"Printer: {printer_info}")
     y_pos -= 2.5*mm
     
     serial = safe_text(order.get('printer_serial','N/A'))
@@ -381,7 +381,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_left, y_pos, f"Predare: {safe_text(order.get('date_received',''))}")
     if order.get('date_completed'):
         y_pos -= 2.5*mm
-        c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('date_completed',''))}")
+        c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('date_picked_up',''))}")
     
     # MIDDLE COLUMN - Repairs
     x_middle = 73*mm
