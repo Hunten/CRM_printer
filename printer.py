@@ -857,7 +857,7 @@ def main():
             st.markdown("**Click on a row to edit that order:**")
             
             event = st.dataframe(
-                df[["order_id", "client_name", "printer_brand", "date_received", "status", "total_cost"]],
+                df[["order_id", "client_name", "printer_brand","printer_serial", "date_received", "status", "total_cost"]],
                 use_container_width=True,
                 selection_mode="single-row",
                 on_select="rerun",
