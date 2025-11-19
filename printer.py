@@ -466,7 +466,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     max_lines = 5
     for word in words:
         test_line = line + word + " "
-        if c.stringWidth(test_line, "Helvetica", 7) < (col_width-10*mm):
+        if c.stringWidth(test_line, "Helvetica", 7) < (col_width-18*mm):
             line = test_line
         else:
             if line_count < max_lines:
