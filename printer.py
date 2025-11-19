@@ -209,7 +209,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(105*mm, title_y, "DOVADA PREDARE ECHIMAPENT IN SERVICE")
     c.setFont("Helvetica-Bold", 10)
-    c.setFillColor(colors.HexColor('#00aa00'))
+    c.setFillColor(colors.HexColor('#E5283A'))
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
     c.setFillColor(colors.black)
   
