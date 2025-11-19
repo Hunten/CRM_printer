@@ -278,7 +278,9 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
 
     #more info
     c.setFont("Helvetica", 7)
-    c.drawCentredString(105*mm, 18*mm, "Având în vedere că dispozitivele din prezenta fișă nu au putut fi testate în momentul preluării lor, acestea sunt considerate ca fiind nefuncționale.")
+    c.drawCentredString(105*mm, 18*mm, "Avand in vedere ca dispozitivele din prezenta fisa nu au putut fi testate in momentul preluarii lor, acestea sunt considerate ca fiind nefunctionale.")
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(105*mm, 15*mm, "Aveti obligatia ca, la finalizarea reparatiei echipamentului aflat in service, sa va prezentati in termen de 30 de zile de la data anuntarii de catre reprezentantul SC PRINTHEAD COMPLETE SOLUTIONS SRL pentru a ridica echipamentul. In cazul neridicarii echipamentului in intervalul specificat mai sus, ne rezervam dreptul de valorificare a acestuia.")
 
     
     # Footer
