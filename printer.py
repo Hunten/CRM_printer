@@ -261,17 +261,17 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
 
     # Signature boxes
     y_pos = 22*mm
-    c.rect(10*mm, y_pos, 85*mm, 20*mm)
+    c.rect(10*mm, y_pos, 85*mm, 18*mm)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(12*mm, y_pos+17*mm, "OPERATOR SERVICE")
     c.setFont("Helvetica", 7)
-    c.drawString(12*mm, y_pos+2*mm, "Semnatura si Stampila")
+    c.drawString(12*mm, y_pos+2*mm, "Semnatura")
     
-    c.rect(115*mm, y_pos, 85*mm, 20*mm)
+    c.rect(115*mm, y_pos, 85*mm, 18*mm)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(117*mm, y_pos+17*mm, "CLIENT")
     c.setFont("Helvetica", 7)
-    c.drawString(117*mm, y_pos+13*mm, f"Nume: {remove_diacritics(safe_text(order.get('client_name','')))}")
+    c.drawString(117*mm, y_pos+13*mm, "Am luat la cunostinta")
     c.drawString(117*mm, y_pos+2*mm, "Semnatura")
     
     # Footer
@@ -499,14 +499,14 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.setFont("Helvetica-Bold", 8)
     c.drawString(12*mm, sig_y+sig_height-3*mm, "OPERATOR SERVICE")
     c.setFont("Helvetica", 7)
-    c.drawString(12*mm, sig_y+2*mm, "Semnatura operator service")
+    c.drawString(12*mm, sig_y+2*mm, "Semnatura")
     
     c.rect(115*mm, sig_y, 85*mm, sig_height)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(117*mm, sig_y+sig_height-3*mm, "CLIENT")
     c.setFont("Helvetica", 7)
     c.drawString(117*mm, sig_y+sig_height-7*mm, "Am luat la cunostinta")
-    c.drawString(117*mm, sig_y+2*mm, "Semnatura client")
+    c.drawString(117*mm, sig_y+2*mm, "Semnatura")
     
     # Footer
     c.setFont("Helvetica", 6)
