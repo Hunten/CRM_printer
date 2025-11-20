@@ -589,7 +589,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.setFont("Helvetica-Bold", 8)
     c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Descriere")
     c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, "Suma (RON)")
-    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row-height)
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
 
     y_cost -= row_height
 
@@ -597,15 +597,15 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.setFont("Helvetica", 8)
     c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Manopera")
     labor = safe_float(order.get('labor_cost',0))
-    c.drawString(table_x+table_width-22*mm, y_cost-row-height+1.5*mm, f"{labor:.2f}")
-    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row-height)
+    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{labor:.2f}")
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
     y_cost -= row_height
 
     # Parts row
     c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Piese")
     parts = safe_float(order.get('parts_cost',0))
-    c.drawString(table_x+table_width-22*mm, y_cost-row-height+1.5*mm, f"{parts:.2f}")
-    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row-height)
+    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{parts:.2f}")
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
     y_cost -= row_height
 
     # Total row
@@ -613,9 +613,9 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.rect(table_x, y_cost-row_height, table_width, row_height, fill=1)
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(table_x+2*mm, y_cost-row-height+1.5*mm, "TOTAL")
+    c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "TOTAL")
     total = safe_float(order.get('total_cost', labor+parts))
-    c.drawString(table_x+table_width-22*mm, y_cost-row-height+1.5*mm, f"{total:.2f}")
+    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{total:.2f}")
 
     # Signature boxes
     sig_y = 22*mm
