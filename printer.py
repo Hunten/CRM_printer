@@ -729,7 +729,7 @@ class PrinterServiceCRM:
         client_name,
         client_phone,
         client_email,
-        printers_list,  # list of dicts: [{"brand":..,"model":..,"serial":..}]
+        printers_list,
         issue_description,
         accessories,
         notes,
@@ -739,7 +739,7 @@ class PrinterServiceCRM:
     
         order_id = f"SRV-{self.next_order_id:05d}"
     
-        # Legacy fields (store first printer)
+        # First printer for legacy columns
         first_brand = ""
         first_model = ""
         first_serial = ""
@@ -749,8 +749,15 @@ class PrinterServiceCRM:
             first_model = safe_text(printers_list[0].get("model", ""))
             first_serial = safe_text(printers_list[0].get("serial", ""))
     
-        # JSON serialize all printers
         printers_json = json.dumps(printers_list, ensure_ascii=False)
+    
+        # --- FIX DATE ERROR ---
+        def to_date_str(d):
+            if isinstance(d, date):
+                return d.strftime("%Y-%m-%d")
+            if isinstance(d, str) and d.strip():
+                return d
+            return ""
     
         new_order = pd.DataFrame([{
             "order_id": order_id,
@@ -764,8 +771,8 @@ class PrinterServiceCRM:
             "issue_description": issue_description,
             "accessories": accessories,
             "notes": notes,
-            "date_received": date_received.strftime("%Y-%m-%d") if date_received else datetime.now().strftime("%Y-%m-%d"),
-            "date_pickup_scheduled": date_pickup.strftime("%Y-%m-%d") if date_pickup else "",
+            "date_received": to_date_str(date_received),
+            "date_pickup_scheduled": to_date_str(date_pickup),
             "date_completed": "",
             "date_picked_up": "",
             "status": "Received",
@@ -778,15 +785,13 @@ class PrinterServiceCRM:
         }])
     
         df = self._read_df(raw=True, ttl=0)
-        if df is None or df.empty:
-            updated_df = new_order
-        else:
-            updated_df = pd.concat([df, new_order], ignore_index=True)
+        updated_df = pd.concat([df, new_order], ignore_index=True) if df is not None and not df.empty else new_order
     
         if self._write_df(updated_df):
             self.next_order_id += 1
             return order_id
         return None
+
 
     def list_orders_df(self) -> pd.DataFrame:
         df = self._read_df(raw=False, ttl=60)
