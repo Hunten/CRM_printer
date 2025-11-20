@@ -723,26 +723,35 @@ class PrinterServiceCRM:
         except Exception as e:
             st.sidebar.error(f"❌ Error saving to Google Sheets: {e}")
             return False
-
+    
     def create_service_order(
-        self, client_name, client_phone, client_email,
-        printers_json,  # list of dicts: {brand, model, serial}
-        issue_description, accessories, notes, date_received, date_pickup
+        self,
+        client_name,
+        client_phone,
+        client_email,
+        printers_list,  # list of dicts: [{"brand":..,"model":..,"serial":..}]
+        issue_description,
+        accessories,
+        notes,
+        date_received,
+        date_pickup
     ):
-
+    
         order_id = f"SRV-{self.next_order_id:05d}"
-
-        # First printer for legacy columns
+    
+        # Legacy fields (store first printer)
         first_brand = ""
         first_model = ""
         first_serial = ""
-        if printers:
-            first_brand = safe_text(printers[0].get("brand", ""))
-            first_model = safe_text(printers[0].get("model", ""))
-            first_serial = safe_text(printers[0].get("serial", ""))
-
-        printers_json = json.dumps(printers, ensure_ascii=False)
-
+    
+        if printers_list:
+            first_brand = safe_text(printers_list[0].get("brand", ""))
+            first_model = safe_text(printers_list[0].get("model", ""))
+            first_serial = safe_text(printers_list[0].get("serial", ""))
+    
+        # JSON serialize all printers
+        printers_json = json.dumps(printers_list, ensure_ascii=False)
+    
         new_order = pd.DataFrame([{
             "order_id": order_id,
             "client_name": client_name,
@@ -767,13 +776,13 @@ class PrinterServiceCRM:
             "parts_cost": 0.0,
             "total_cost": 0.0,
         }])
-
+    
         df = self._read_df(raw=True, ttl=0)
         if df is None or df.empty:
             updated_df = new_order
         else:
             updated_df = pd.concat([df, new_order], ignore_index=True)
-
+    
         if self._write_df(updated_df):
             self.next_order_id += 1
             return order_id
