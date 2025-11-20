@@ -629,7 +629,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
 
     c.rect(115*mm, sig_y, 85*mm, sig_height)
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(117*mm, sig_y+sig-height-3*mm, "CLIENT")
+    c.drawString(117*mm, sig_y+sig_height-3*mm, "CLIENT")
     c.setFont("Helvetica", 7)
     c.drawString(117*mm, sig_y+sig_height-7*mm, "Am luat la cunostinta")
     c.drawString(117*mm, sig_y+2*mm, "Semnatura")
