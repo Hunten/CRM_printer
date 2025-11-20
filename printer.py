@@ -655,79 +655,7 @@ class PrinterServiceCRM:
         self.next_order_id = 1
         self._init_sheet()
 
-    def _init_sheet(self):
-        """Ensure headers exist and compute next_order_id with fill-the-gap logic."""
-        df = self._read_df(raw=True, ttl=0)
-        
-            # CASE 1 — Sheet is missing or fully empty → create new sheet
-        if df is None or df.empty:
-            columns = [
-                "order_id", "client_name", "client_phone", "client_email",
-                "printer_brand", "printer_model", "printer_serial",
-                "printers_json",
-                "issue_description", "accessories", "notes",
-                "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
-                "status", "technician", "repair_details", "parts_used",
-                "labor_cost", "parts_cost", "total_cost",
-            ]
-            df = pd.DataFrame(columns=columns)
-            self._write_df(df, allow_empty=False)
-            self.next_order_id = 1
-            return
-        
-            # CASE 2 — Sheet exists but order_id column is missing → recreate sheet header
-        if "order_id" not in df.columns:
-            columns = [
-                "order_id", "client_name", "client_phone", "client_email",
-                "printer_brand", "printer_model", "printer_serial",
-                "printers_json",
-                "issue_description", "accessories", "notes",
-                "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
-                "status", "technician", "repair_details", "parts_used",
-                "labor_cost", "parts_cost", "total_cost",
-            ]
-            new_df = pd.DataFrame(columns=columns)
-            self._write_df(new_df, allow_empty=False)
-            self.next_order_id = 1
-            return
-        
-            # CASE 3 — Ensure printers_json exists
-        if "printers_json" not in df.columns:
-            df["printers_json"] = ""
-            self._write_df(df, allow_empty=False)
-        
-            # CASE 4 — Determine next order ID with fill-the-gap logic
-        existing = []
-        
-        for oid in df["order_id"]:
-            try:
-                if isinstance(oid, str) and oid.startswith("SRV-"):
-                    num = int(oid.split("-")[1])
-                    existing.append(num)
-            except:
-                continue
-        
-            # CASE 4A — No existing IDs → start fresh
-        if not existing:
-            self.next_order_id = 1
-            return
-        
-        existing_sorted = sorted(existing)
-        
-            # CASE 4B — Find the first missing ID
-        missing = None
-        for i in range(1, existing_sorted[-1] + 1):
-            if i not in existing_sorted:
-                missing = i
-                break
-        
-        if missing:
-            self.next_order_id = missing
-        else:
-                # No gaps → next is max + 1
-            self.next_order_id = existing_sorted[-1] + 1
-
-    def _read_df(self, raw: bool = True, ttl: int = 0) -> pd.DataFrame:
+    def _read_df(self, raw: bool = True, ttl: int = 0) -> pd.DataFrame | None:
         """Read Google Sheets into DataFrame safely."""
         try:
             df = self.conn.read(
@@ -758,7 +686,78 @@ class PrinterServiceCRM:
         except Exception as e:
             st.sidebar.error(f"❌ Error saving to Google Sheets: {e}")
             return False
-    
+
+    def _init_sheet(self):
+        """Ensure headers exist and compute next_order_id with fill-the-gap logic."""
+        df = self._read_df(raw=True, ttl=0)
+
+        # CASE 1 — Sheet is missing or fully empty → create new sheet
+        if df is None or df.empty:
+            columns = [
+                "order_id", "client_name", "client_phone", "client_email",
+                "printer_brand", "printer_model", "printer_serial",
+                "printers_json",
+                "issue_description", "accessories", "notes",
+                "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
+                "status", "technician", "repair_details", "parts_used",
+                "labor_cost", "parts_cost", "total_cost",
+            ]
+            df = pd.DataFrame(columns=columns)
+            self._write_df(df, allow_empty=False)
+            self.next_order_id = 1
+            return
+
+        # CASE 2 — Sheet exists but order_id column is missing → recreate sheet header
+        if "order_id" not in df.columns:
+            columns = [
+                "order_id", "client_name", "client_phone", "client_email",
+                "printer_brand", "printer_model", "printer_serial",
+                "printers_json",
+                "issue_description", "accessories", "notes",
+                "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
+                "status", "technician", "repair_details", "parts_used",
+                "labor_cost", "parts_cost", "total_cost",
+            ]
+            new_df = pd.DataFrame(columns=columns)
+            self._write_df(new_df, allow_empty=False)
+            self.next_order_id = 1
+            return
+
+        # CASE 3 — Ensure printers_json exists
+        if "printers_json" not in df.columns:
+            df["printers_json"] = ""
+            self._write_df(df, allow_empty=False)
+
+        # CASE 4 — Determine next order ID with fill-the-gap logic
+        existing = []
+        for oid in df["order_id"]:
+            try:
+                if isinstance(oid, str) and oid.startswith("SRV-"):
+                    num = int(oid.split("-")[1])
+                    existing.append(num)
+            except Exception:
+                continue
+
+        # CASE 4A — No existing IDs → start fresh
+        if not existing:
+            self.next_order_id = 1
+            return
+
+        existing_sorted = sorted(existing)
+
+        # CASE 4B — Find the first missing ID
+        missing = None
+        for i in range(1, existing_sorted[-1] + 1):
+            if i not in existing_sorted:
+                missing = i
+                break
+
+        if missing:
+            self.next_order_id = missing
+        else:
+            # No gaps → next is max + 1
+            self.next_order_id = existing_sorted[-1] + 1
+
     def create_service_order(
         self,
         client_name,
@@ -771,29 +770,27 @@ class PrinterServiceCRM:
         date_received,
         date_pickup
     ):
-    
         order_id = f"SRV-{self.next_order_id:05d}"
-    
+
         # First printer for legacy columns
         first_brand = ""
         first_model = ""
         first_serial = ""
-    
+
         if printers_list:
             first_brand = safe_text(printers_list[0].get("brand", ""))
             first_model = safe_text(printers_list[0].get("model", ""))
             first_serial = safe_text(printers_list[0].get("serial", ""))
-    
+
         printers_json = json.dumps(printers_list, ensure_ascii=False)
-    
-        # --- FIX DATE ERROR ---
+
         def to_date_str(d):
             if isinstance(d, date):
                 return d.strftime("%Y-%m-%d")
             if isinstance(d, str) and d.strip():
                 return d
             return ""
-    
+
         new_order = pd.DataFrame([{
             "order_id": order_id,
             "client_name": client_name,
@@ -818,15 +815,14 @@ class PrinterServiceCRM:
             "parts_cost": 0.0,
             "total_cost": 0.0,
         }])
-    
+
         df = self._read_df(raw=True, ttl=0)
         updated_df = pd.concat([df, new_order], ignore_index=True) if df is not None and not df.empty else new_order
-    
+
         if self._write_df(updated_df):
             self.next_order_id += 1
             return order_id
         return None
-
 
     def list_orders_df(self) -> pd.DataFrame:
         df = self._read_df(raw=False, ttl=60)
@@ -931,8 +927,12 @@ def main():
     cols = st.columns(4)
     for idx, (col, title) in enumerate(zip(cols, tab_titles)):
         with col:
-            if st.button(title, key=f"tab_btn_{idx}", use_container_width=True, 
-                        type="primary" if st.session_state["active_tab"] == idx else "secondary"):
+            if st.button(
+                title,
+                key=f"tab_btn_{idx}",
+                use_container_width=True,
+                type="primary" if st.session_state["active_tab"] == idx else "secondary",
+            ):
                 st.session_state["active_tab"] = idx
                 st.rerun()
 
@@ -1180,44 +1180,45 @@ def main():
                     colp_r1, colp_r2 = st.columns(2)
                     with colp_r1:
                         if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
-                        # 1) Ștergere locală
+                            # 1) Ștergere locală
                             st.session_state[state_key] = [
-                            p for p, flag in zip(current_printers, remove_flags) if not flag
-                        ]
-                        if not st.session_state[state_key]:
-                            st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
-                    
-                        # 2) Regenerăm JSON-ul pentru spreadsheet
-                        printers_clean = []
-                        for p in st.session_state[state_key]:
-                            brand = safe_text(p.get("brand", "")).strip()
-                            model = safe_text(p.get("model", "")).strip()
-                            serial = safe_text(p.get("serial", "")).strip()
-                            if brand or model or serial:
-                                printers_clean.append({
-                                    "brand": brand,
-                                    "model": model,
-                                    "serial": serial,
-                                })
-                    
-                        printers_json = json.dumps(printers_clean, ensure_ascii=False)
-                    
-                        # 3) Actualizăm și câmpurile legacy
-                        fb, fm, fs = "", "", ""
-                        if printers_clean:
-                            fb, fm, fs = printers_clean[0]["brand"], printers_clean[0]["model"], printers_clean[0]["serial"]
-                    
-                        # 4) Scriem în spreadsheet imediat
-                        crm.update_order(selected_order_id,
-                            printers_json=printers_json,
-                            printer_brand=fb,
-                            printer_model=fm,
-                            printer_serial=fs
-                        )
-                    
-                        # 5) Reafișăm pagina
-                        st.success("🗑 Imprimantele selectate au fost șterse!")
-                        st.rerun()
+                                p for p, flag in zip(current_printers, remove_flags) if not flag
+                            ]
+                            if not st.session_state[state_key]:
+                                st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
+
+                            # 2) Regenerăm JSON-ul pentru spreadsheet
+                            printers_clean = []
+                            for p in st.session_state[state_key]:
+                                brand = safe_text(p.get("brand", "")).strip()
+                                model = safe_text(p.get("model", "")).strip()
+                                serial = safe_text(p.get("serial", "")).strip()
+                                if brand or model or serial:
+                                    printers_clean.append({
+                                        "brand": brand,
+                                        "model": model,
+                                        "serial": serial,
+                                    })
+
+                            printers_json = json.dumps(printers_clean, ensure_ascii=False)
+
+                            # 3) Actualizăm și câmpurile legacy
+                            fb, fm, fs = "", "", ""
+                            if printers_clean:
+                                fb, fm, fs = printers_clean[0]["brand"], printers_clean[0]["model"], printers_clean[0]["serial"]
+
+                            # 4) Scriem în spreadsheet imediat
+                            crm.update_order(
+                                selected_order_id,
+                                printers_json=printers_json,
+                                printer_brand=fb,
+                                printer_model=fm,
+                                printer_serial=fs
+                            )
+
+                            # 5) Reafișăm pagina
+                            st.success("🗑 Imprimantele selectate au fost șterse!")
+                            st.rerun()
 
                     with colp_r2:
                         if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
@@ -1338,31 +1339,35 @@ def main():
 
                     st.divider()
                     st.subheader("📄 Download Receipts")
-                    # Get logo from session state
+
+                    # Re-citim comanda proaspăt din sheet pentru PDF-uri actualizate
+                    df_latest = crm._read_df(raw=True, ttl=0)
+                    order_latest = df_latest[df_latest["order_id"] == selected_order_id].iloc[0].to_dict()
+
                     logo = st.session_state.get("logo_image", None)
 
                     colp1, colp2 = st.columns(2)
                     with colp1:
                         st.markdown("**Initial Receipt**")
-                        pdf_init = generate_initial_receipt_pdf(order, st.session_state["company_info"], logo)
+                        pdf_init = generate_initial_receipt_pdf(order_latest, st.session_state["company_info"], logo)
                         st.download_button(
                             "📄 Download Initial",
                             pdf_init,
-                            f"Initial_{order['order_id']}.pdf",
+                            f"Initial_{order_latest['order_id']}.pdf",
                             "application/pdf",
                             use_container_width=True,
-                            key=f"dl_upd_init_{order['order_id']}",
+                            key=f"dl_upd_init_{order_latest['order_id']}",
                         )
                     with colp2:
                         st.markdown("**Completion Receipt**")
-                        pdf_comp = generate_completion_receipt_pdf(order, st.session_state["company_info"], logo)
+                        pdf_comp = generate_completion_receipt_pdf(order_latest, st.session_state["company_info"], logo)
                         st.download_button(
                             "📄 Download Completion",
                             pdf_comp,
-                            f"Completion_{order['order_id']}.pdf",
+                            f"Completion_{order_latest['order_id']}.pdf",
                             "application/pdf",
                             use_container_width=True,
-                            key=f"dl_upd_comp_{order['order_id']}",
+                            key=f"dl_upd_comp_{order_latest['order_id']}",
                         )
         else:
             st.info("📝 No orders yet.")
