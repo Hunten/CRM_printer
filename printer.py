@@ -655,77 +655,77 @@ class PrinterServiceCRM:
         self.next_order_id = 1
         self._init_sheet()
 
-        def _init_sheet(self):
-            """Ensure headers exist and compute next_order_id with fill-the-gap logic."""
-            df = self._read_df(raw=True, ttl=0)
+    def _init_sheet(self):
+        """Ensure headers exist and compute next_order_id with fill-the-gap logic."""
+        df = self._read_df(raw=True, ttl=0)
         
             # CASE 1 — Sheet is missing or fully empty → create new sheet
-            if df is None or df.empty:
-                columns = [
-                    "order_id", "client_name", "client_phone", "client_email",
-                    "printer_brand", "printer_model", "printer_serial",
-                    "printers_json",
-                    "issue_description", "accessories", "notes",
-                    "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
-                    "status", "technician", "repair_details", "parts_used",
-                    "labor_cost", "parts_cost", "total_cost",
-                ]
-                df = pd.DataFrame(columns=columns)
-                self._write_df(df, allow_empty=False)
-                self.next_order_id = 1
-                return
+        if df is None or df.empty:
+            columns = [
+                "order_id", "client_name", "client_phone", "client_email",
+                "printer_brand", "printer_model", "printer_serial",
+                "printers_json",
+                "issue_description", "accessories", "notes",
+                "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
+                "status", "technician", "repair_details", "parts_used",
+                "labor_cost", "parts_cost", "total_cost",
+            ]
+            df = pd.DataFrame(columns=columns)
+            self._write_df(df, allow_empty=False)
+            self.next_order_id = 1
+            return
         
             # CASE 2 — Sheet exists but order_id column is missing → recreate sheet header
-            if "order_id" not in df.columns:
-                columns = [
-                    "order_id", "client_name", "client_phone", "client_email",
-                    "printer_brand", "printer_model", "printer_serial",
-                    "printers_json",
-                    "issue_description", "accessories", "notes",
-                    "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
-                    "status", "technician", "repair_details", "parts_used",
-                    "labor_cost", "parts_cost", "total_cost",
-                ]
-                new_df = pd.DataFrame(columns=columns)
-                self._write_df(new_df, allow_empty=False)
-                self.next_order_id = 1
-                return
+        if "order_id" not in df.columns:
+            columns = [
+                "order_id", "client_name", "client_phone", "client_email",
+                "printer_brand", "printer_model", "printer_serial",
+                "printers_json",
+                "issue_description", "accessories", "notes",
+                "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
+                "status", "technician", "repair_details", "parts_used",
+                "labor_cost", "parts_cost", "total_cost",
+            ]
+            new_df = pd.DataFrame(columns=columns)
+            self._write_df(new_df, allow_empty=False)
+            self.next_order_id = 1
+            return
         
             # CASE 3 — Ensure printers_json exists
-            if "printers_json" not in df.columns:
-                df["printers_json"] = ""
-                self._write_df(df, allow_empty=False)
+        if "printers_json" not in df.columns:
+            df["printers_json"] = ""
+            self._write_df(df, allow_empty=False)
         
             # CASE 4 — Determine next order ID with fill-the-gap logic
-            existing = []
+        existing = []
         
-            for oid in df["order_id"]:
-                try:
-                    if isinstance(oid, str) and oid.startswith("SRV-"):
-                        num = int(oid.split("-")[1])
-                        existing.append(num)
-                except:
-                    continue
+        for oid in df["order_id"]:
+            try:
+                if isinstance(oid, str) and oid.startswith("SRV-"):
+                    num = int(oid.split("-")[1])
+                    existing.append(num)
+            except:
+                continue
         
             # CASE 4A — No existing IDs → start fresh
-            if not existing:
-                self.next_order_id = 1
-                return
+        if not existing:
+            self.next_order_id = 1
+            return
         
-            existing_sorted = sorted(existing)
+        existing_sorted = sorted(existing)
         
             # CASE 4B — Find the first missing ID
-            missing = None
-            for i in range(1, existing_sorted[-1] + 1):
-                if i not in existing_sorted:
-                    missing = i
-                    break
+        missing = None
+        for i in range(1, existing_sorted[-1] + 1):
+            if i not in existing_sorted:
+                missing = i
+                break
         
-            if missing:
-                self.next_order_id = missing
-            else:
+        if missing:
+            self.next_order_id = missing
+        else:
                 # No gaps → next is max + 1
-                self.next_order_id = existing_sorted[-1] + 1
+            self.next_order_id = existing_sorted[-1] + 1
 
 
     def _write_df(self, df: pd.DataFrame, allow_empty: bool = False) -> bool:
