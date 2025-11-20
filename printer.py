@@ -724,11 +724,11 @@ class PrinterServiceCRM:
             st.sidebar.error(f"❌ Error saving to Google Sheets: {e}")
             return False
 
-        def create_service_order(
-            self, client_name, client_phone, client_email,
-            printers_json,  # list of dicts: {brand, model, serial}
-            issue_description, accessories, notes, date_received, date_pickup
-        )
+    def create_service_order(
+        self, client_name, client_phone, client_email,
+        printers_json,  # list of dicts: {brand, model, serial}
+        issue_description, accessories, notes, date_received, date_pickup
+    ):
 
         order_id = f"SRV-{self.next_order_id:05d}"
 
