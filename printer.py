@@ -1174,7 +1174,7 @@ def main():
                     with colp_r1:
                         if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
                         # 1) Ștergere locală
-                        st.session_state[state_key] = [
+                            st.session_state[state_key] = [
                             p for p, flag in zip(current_printers, remove_flags) if not flag
                         ]
                         if not st.session_state[state_key]:
