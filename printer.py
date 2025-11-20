@@ -13,6 +13,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 from PIL import Image
+import json  # ✅ NEW: for multiple printers JSON
 
 
 # ============================================================================
@@ -53,6 +54,10 @@ if "last_created_order" not in st.session_state:
 
 if "pdf_downloaded" not in st.session_state:
     st.session_state["pdf_downloaded"] = False
+
+# For new-order temporary printers
+if "temp_printers" not in st.session_state:
+    st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
 
 
 # ============================================================================
@@ -133,6 +138,42 @@ def safe_float(value: object, default: float = 0.0) -> float:
         return float(value)
     except Exception:
         return default
+
+
+def load_printers_from_order(order: dict):
+    """
+    Returnează o listă de imprimante din order:
+    - încearcă printers_json
+    - dacă e gol, folosește printer_brand/model/serial legacy
+    """
+    printers = []
+    raw = safe_text(order.get("printers_json", "")).strip()
+    if raw:
+        try:
+            printers = json.loads(raw)
+        except Exception:
+            printers = []
+
+    if not printers:
+        # fallback la campurile vechi
+        brand = safe_text(order.get("printer_brand", "")).strip()
+        model = safe_text(order.get("printer_model", "")).strip()
+        serial = safe_text(order.get("printer_serial", "")).strip()
+        if brand or model or serial:
+            printers = [{
+                "brand": brand,
+                "model": model,
+                "serial": serial
+            }]
+    # asigura structura
+    cleaned = []
+    for p in printers:
+        cleaned.append({
+            "brand": safe_text(p.get("brand", "")),
+            "model": safe_text(p.get("model", "")),
+            "serial": safe_text(p.get("serial", "")),
+        })
+    return cleaned
 
 
 # ============================================================================
@@ -239,21 +280,38 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     c.drawCentredString(105*mm, title_y-6*mm, f"Nr. Comanda: {safe_text(order.get('order_id',''))}")
     c.setFillColor(colors.black)
 
-    # Equipment details
+    # Equipment details (MULTIPLE PRINTERS)
     y_pos = height-50*mm
     c.setFont("Helvetica-Bold", 9)
     c.drawString(10*mm, y_pos, "DETALII ECHIPAMENT:")
     y_pos -= 5*mm
     c.setFont("Helvetica", 8)
 
-    printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
-    c.drawString(10*mm, y_pos, f"Imprimanta: {printer_info}")
-    y_pos -= 4*mm
+    printers = load_printers_from_order(order)
 
-    serial = safe_text(order.get('printer_serial','N/A'))
-    c.drawString(10*mm, y_pos, f"Serie: {serial}")
-    y_pos -= 4*mm
+    if printers:
+        for idx, p in enumerate(printers, start=1):
+            brand = remove_diacritics(safe_text(p.get("brand", "")))
+            model = remove_diacritics(safe_text(p.get("model", "")))
+            serial = safe_text(p.get("serial", ""))
 
+            line = f"{idx}. {brand} {model}"
+            if serial:
+                line += f" (SN: {serial})"
+
+            c.drawString(10*mm, y_pos, line)
+            y_pos -= 4*mm
+    else:
+        # fallback daca totusi nu exista nicio imprimanta
+        printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
+        c.drawString(10*mm, y_pos, f"Imprimanta: {printer_info}")
+        y_pos -= 4*mm
+        serial = safe_text(order.get('printer_serial',''))
+        if serial:
+            c.drawString(10*mm, y_pos, f"Serie: {serial}")
+            y_pos -= 4*mm
+
+    # Data si accesorii - la nivel de comanda
     c.drawString(10*mm, y_pos, f"Data predarii: {safe_text(order.get('date_received',''))}")
     y_pos -= 4*mm
 
@@ -416,30 +474,44 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     y_start = height-50*mm
     col_width = 63*mm
 
-    # LEFT COLUMN - Equipment details
+    # LEFT COLUMN - Equipment details (MULTIPLE PRINTERS)
     x_left = 10*mm
-    y_pos = height-50*mm
+    y_pos = y_start
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(10*mm, y_pos, "DETALII ECHIPAMENT:")
+    c.drawString(x_left, y_pos, "DETALII ECHIPAMENT:")
     y_pos -= 5*mm
     c.setFont("Helvetica", 8)
 
-    printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
-    c.drawString(10*mm, y_pos, f"Imprimanta: {printer_info}")
-    y_pos -= 4*mm
+    printers = load_printers_from_order(order)
+    if printers:
+        for idx, p in enumerate(printers, start=1):
+            brand = remove_diacritics(safe_text(p.get("brand", "")))
+            model = remove_diacritics(safe_text(p.get("model", "")))
+            serial = safe_text(p.get("serial", ""))
 
-    serial = safe_text(order.get('printer_serial','N/A'))
-    c.drawString(10*mm, y_pos, f"Serie: {serial}")
-    y_pos -= 4*mm
+            line = f"{idx}. {brand} {model}"
+            if serial:
+                line += f" (SN: {serial})"
 
-    c.drawString(10*mm, y_pos, f"Data predarii: {safe_text(order.get('date_received',''))}")
-    if order.get('date_completed'):
+            c.drawString(x_left, y_pos, line)
+            y_pos -= 4*mm
+    else:
+        printer_info = f"{remove_diacritics(safe_text(order.get('printer_brand','')))} {remove_diacritics(safe_text(order.get('printer_model','')))}"
+        c.drawString(x_left, y_pos, f"Imprimanta: {printer_info}")
         y_pos -= 4*mm
-        c.drawString(x_left, y_pos, f"Finalizare: {safe_text(order.get('date_picked_up',''))}")
+        serial = safe_text(order.get('printer_serial',''))
+        if serial:
+            c.drawString(x_left, y_pos, f"Serie: {serial}")
+            y_pos -= 4*mm
+
+    c.drawString(x_left, y_pos, f"Data predarii: {safe_text(order.get('date_received',''))}")
+    if order.get('date_picked_up'):
+        y_pos -= 4*mm
+        c.drawString(x_left, y_pos, f"Ridicare: {safe_text(order.get('date_picked_up',''))}")
     accessories = safe_text(order.get('accessories',''))
     if accessories and accessories.strip():
         y_pos -= 4*mm
-        c.drawString(10*mm, y_pos, f"Accesorii: {remove_diacritics(accessories)}")
+        c.drawString(x_left, y_pos, f"Accesorii: {remove_diacritics(accessories)}")
     
     # MIDDLE COLUMN - Repairs
     x_middle = 73*mm
@@ -481,6 +553,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     words = parts_text.split()
     line = ""
     line_count = 0
+    max_lines = 5
     for word in words:
         test_line = line + word + " "
         if c.stringWidth(test_line, "Helvetica", 7) < (col_width-2*mm):
@@ -589,6 +662,7 @@ class PrinterServiceCRM:
             columns = [
                 "order_id", "client_name", "client_phone", "client_email",
                 "printer_brand", "printer_model", "printer_serial",
+                "printers_json",  # ✅ NEW column
                 "issue_description", "accessories", "notes",
                 "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
                 "status", "technician", "repair_details", "parts_used",
@@ -598,6 +672,11 @@ class PrinterServiceCRM:
             self._write_df(df, allow_empty=False)
             self.next_order_id = 1
         else:
+            # Asigura existenta coloanei printers_json pentru sheet-uri deja existente
+            if "printers_json" not in df.columns:
+                df["printers_json"] = ""
+                self._write_df(df, allow_empty=False)
+
             if "order_id" in df.columns and not df["order_id"].isna().all():
                 try:
                     max_id = max(
@@ -646,18 +725,32 @@ class PrinterServiceCRM:
             return False
 
     def create_service_order(
-        self, client_name, client_phone, client_email, printer_brand, printer_model,
-        printer_serial, issue_description, accessories, notes, date_received, date_pickup
+        self, client_name, client_phone, client_email,
+        printers,  # ✅ list of dicts: {brand, model, serial}
+        issue_description, accessories, notes, date_received, date_pickup
     ):
         order_id = f"SRV-{self.next_order_id:05d}"
+
+        # Prima imprimanta pentru coloanele legacy
+        first_brand = ""
+        first_model = ""
+        first_serial = ""
+        if printers:
+            first_brand = safe_text(printers[0].get("brand", ""))
+            first_model = safe_text(printers[0].get("model", ""))
+            first_serial = safe_text(printers[0].get("serial", ""))
+
+        printers_json = json.dumps(printers, ensure_ascii=False)
+
         new_order = pd.DataFrame([{
             "order_id": order_id,
             "client_name": client_name,
             "client_phone": client_phone,
             "client_email": client_email,
-            "printer_brand": printer_brand,
-            "printer_model": printer_model,
-            "printer_serial": printer_serial,
+            "printer_brand": first_brand,
+            "printer_model": first_model,
+            "printer_serial": first_serial,
+            "printers_json": printers_json,
             "issue_description": issue_description,
             "accessories": accessories,
             "notes": notes,
@@ -801,45 +894,93 @@ def main():
         st.header("Create New Service Order")
         
         if not st.session_state["last_created_order"] or st.session_state["pdf_downloaded"]:
-            with st.form(key="new_order_form", clear_on_submit=True):
+            # Asigura lista temporara de imprimante
+            if "temp_printers" not in st.session_state or not st.session_state["temp_printers"]:
+                st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
+
+            with st.form(key="new_order_form", clear_on_submit=False):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.subheader("Client Information")
-                    client_name = st.text_input("Name *")
-                    client_phone = st.text_input("Phone *")
-                    client_email = st.text_input("Email")
+                    client_name = st.text_input("Name *", key="new_client_name")
+                    client_phone = st.text_input("Phone *", key="new_client_phone")
+                    client_email = st.text_input("Email", key="new_client_email")
                 with col2:
-                    st.subheader("Printer Information")
-                    printer_brand = st.text_input("Brand *")
-                    printer_model = st.text_input("Model *")
-                    printer_serial = st.text_input("Serial Number")
+                    st.subheader("Order Dates")
+                    date_received = st.date_input("Date Received *", value=date.today(), key="new_date_received")
+                    date_pickup = st.date_input("Scheduled Pickup (optional)", value=None, key="new_date_pickup")
 
-                col3, col4 = st.columns(2)
-                with col3:
-                    date_received = st.date_input("Date Received *", value=date.today())
-                with col4:
-                    date_pickup = st.date_input("Scheduled Pickup (optional)", value=None)
+                st.subheader("Printers in This Order")
 
-                issue_description = st.text_area("Issue Description *", height=100)
-                accessories = st.text_input("Accessories (cables, cartridges, etc.)")
-                notes = st.text_area("Additional Notes", height=60)
+                # MULTI-PRINTER UI
+                printers_list = st.session_state["temp_printers"]
+
+                # Draw each printer row
+                remove_indices = []
+                for i, p in enumerate(printers_list):
+                    st.markdown(f"**Printer #{i+1}**")
+                    colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.5])
+                    with colA:
+                        p["brand"] = st.text_input(f"Brand #{i+1} *", value=p["brand"], key=f"new_printer_brand_{i}")
+                    with colB:
+                        p["model"] = st.text_input(f"Model #{i+1} *", value=p["model"], key=f"new_printer_model_{i}")
+                    with colC:
+                        p["serial"] = st.text_input(f"Serial #{i+1}", value=p["serial"], key=f"new_printer_serial_{i}")
+                    with colD:
+                        if st.button("❌", key=f"new_remove_printer_{i}"):
+                            remove_indices.append(i)
+
+                # Remove printers marked
+                if remove_indices:
+                    for idx_rm in sorted(remove_indices, reverse=True):
+                        if 0 <= idx_rm < len(st.session_state["temp_printers"]):
+                            st.session_state["temp_printers"].pop(idx_rm)
+                    if not st.session_state["temp_printers"]:
+                        st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
+                    st.rerun()
+
+                if st.button("➕ Add another printer", key="new_add_printer"):
+                    st.session_state["temp_printers"].append({"brand": "", "model": "", "serial": ""})
+                    st.rerun()
+
+                issue_description = st.text_area("Issue Description *", height=100, key="new_issue_description")
+                accessories = st.text_input("Accessories (cables, cartridges, etc.)", key="new_accessories")
+                notes = st.text_area("Additional Notes", height=60, key="new_notes")
 
                 submit = st.form_submit_button("🎫 Create Order", type="primary", use_container_width=True)
 
                 if submit:
-                    if client_name and client_phone and printer_brand and printer_model and issue_description:
+                    # Curata lista de imprimante - doar cele completate
+                    printers_clean = []
+                    for p in st.session_state["temp_printers"]:
+                        brand = safe_text(p.get("brand", "")).strip()
+                        model = safe_text(p.get("model", "")).strip()
+                        serial = safe_text(p.get("serial", "")).strip()
+                        if brand or model or serial:
+                            printers_clean.append({
+                                "brand": brand,
+                                "model": model,
+                                "serial": serial,
+                            })
+
+                    if not client_name or not client_phone or not issue_description:
+                        st.error("❌ Please fill in all required fields (*) for client and issue.")
+                    elif not printers_clean:
+                        st.error("❌ Please add at least one printer (brand and model).")
+                    else:
                         order_id = crm.create_service_order(
-                            client_name, client_phone, client_email, printer_brand, printer_model,
-                            printer_serial, issue_description, accessories, notes, date_received, date_pickup
+                            client_name, client_phone, client_email,
+                            printers_clean,
+                            issue_description, accessories, notes, date_received, date_pickup
                         )
                         if order_id:
                             st.session_state["last_created_order"] = order_id
                             st.session_state["pdf_downloaded"] = False
+                            # reset temp printers pentru urmatoarea comanda
+                            st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
                             st.success(f"✅ Order Created: **{order_id}**")
                             st.balloons()
                             st.rerun()
-                    else:
-                        st.error("❌ Please fill in all required fields (*)")
 
         if st.session_state["last_created_order"] and not st.session_state["pdf_downloaded"]:
             df_fresh = crm.list_orders_df()
@@ -893,7 +1034,7 @@ def main():
                 selected_order_id = df.iloc[selected_idx]["order_id"]
                 
                 st.session_state["selected_order_for_update"] = selected_order_id
-                st.session_state["previous_selected_order"] = None
+                st.session_state["previous_selected_order"] = selected_order_id
                 st.session_state["active_tab"] = 2
                 st.rerun()
 
@@ -935,10 +1076,6 @@ def main():
                 on_change=on_order_select
             )
 
-            if st.session_state["previous_selected_order"] != selected_order_id:
-                st.session_state["previous_selected_order"] = selected_order_id
-                st.rerun()
-
             if selected_order_id:
                 df_fresh = crm._read_df(raw=True, ttl=0)
                 order_row = df_fresh[df_fresh["order_id"] == selected_order_id]
@@ -948,16 +1085,53 @@ def main():
                 else:
                     order = order_row.iloc[0].to_dict()
 
+                    # load printers for this order
+                    printers_initial = load_printers_from_order(order)
+                    state_key = f"upd_printers_{selected_order_id}"
+                    if state_key not in st.session_state:
+                        st.session_state[state_key] = printers_initial if printers_initial else [{"brand": "", "model": "", "serial": ""}]
+                    current_printers = st.session_state[state_key]
+
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write(f"**Client:** {safe_text(order.get('client_name'))}")
                         st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
-                        st.write(f"**Printer:** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
-                        st.write(f"**Serial:** {safe_text(order.get('printer_serial'))}")
+                        st.write(f"**Printer (main):** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
+                        st.write(f"**Serial (main):** {safe_text(order.get('printer_serial'))}")
                     with col2:
                         st.write(f"**Received:** {safe_text(order.get('date_received'))}")
                         st.write(f"**Issue:** {safe_text(order.get('issue_description'))}")
                         st.write(f"**Accessories:** {safe_text(order.get('accessories'))}")
+
+                    st.divider()
+
+                    st.subheader("Printers in This Order")
+
+                    remove_indices = []
+                    for i, p in enumerate(current_printers):
+                        st.markdown(f"**Printer #{i+1}**")
+                        colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.5])
+                        with colA:
+                            p["brand"] = st.text_input(f"Brand #{i+1}", value=p["brand"], key=f"upd_brand_{selected_order_id}_{i}")
+                        with colB:
+                            p["model"] = st.text_input(f"Model #{i+1}", value=p["model"], key=f"upd_model_{selected_order_id}_{i}")
+                        with colC:
+                            p["serial"] = st.text_input(f"Serial #{i+1}", value=p["serial"], key=f"upd_serial_{selected_order_id}_{i}")
+                        with colD:
+                            if st.button("❌", key=f"upd_remove_printer_{selected_order_id}_{i}"):
+                                remove_indices.append(i)
+
+                    if remove_indices:
+                        for idx_rm in sorted(remove_indices, reverse=True):
+                            if 0 <= idx_rm < len(st.session_state[state_key]):
+                                st.session_state[state_key].pop(idx_rm)
+                        if not st.session_state[state_key]:
+                            st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
+                        st.rerun()
+
+                    if st.button("➕ Add another printer", key=f"upd_add_printer_{selected_order_id}"):
+                        st.session_state[state_key].append({"brand": "", "model": "", "serial": ""})
+                        st.rerun()
 
                     st.divider()
 
@@ -1022,6 +1196,29 @@ def main():
                     colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
 
                     if st.button("💾 Update Order", type="primary", key=f"update_order_btn_{selected_order_id}"):
+                        # Curata lista de imprimante pentru salvare
+                        printers_clean = []
+                        for p in st.session_state[state_key]:
+                            brand = safe_text(p.get("brand", "")).strip()
+                            model = safe_text(p.get("model", "")).strip()
+                            serial = safe_text(p.get("serial", "")).strip()
+                            if brand or model or serial:
+                                printers_clean.append({
+                                    "brand": brand,
+                                    "model": model,
+                                    "serial": serial,
+                                })
+
+                        printers_json = json.dumps(printers_clean, ensure_ascii=False)
+
+                        first_brand = ""
+                        first_model = ""
+                        first_serial = ""
+                        if printers_clean:
+                            first_brand = printers_clean[0]["brand"]
+                            first_model = printers_clean[0]["model"]
+                            first_serial = printers_clean[0]["serial"]
+
                         updates = {
                             "status": new_status,
                             "repair_details": repair_details,
@@ -1029,6 +1226,10 @@ def main():
                             "technician": technician,
                             "labor_cost": labor_cost,
                             "parts_cost": parts_cost,
+                            "printers_json": printers_json,
+                            "printer_brand": first_brand,
+                            "printer_model": first_model,
+                            "printer_serial": first_serial,
                         }
 
                         if new_status == "Ready for Pickup" and not order.get("date_completed"):
