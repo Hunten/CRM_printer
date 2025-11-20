@@ -727,6 +727,21 @@ class PrinterServiceCRM:
                 # No gaps → next is max + 1
             self.next_order_id = existing_sorted[-1] + 1
 
+    def _read_df(self, raw: bool = True, ttl: int = 0) -> pd.DataFrame:
+        """Read Google Sheets into DataFrame safely."""
+        try:
+            df = self.conn.read(
+                worksheet=self.worksheet,
+                ttl=ttl
+            )
+            if df is None:
+                return None
+            if raw:
+                return df
+            return df.fillna("")
+        except Exception as e:
+            st.sidebar.error(f"❌ Error reading Google Sheets: {e}")
+            return None
 
     def _write_df(self, df: pd.DataFrame, allow_empty: bool = False) -> bool:
         """Write entire DataFrame to Sheets. Prevents accidental data loss."""
