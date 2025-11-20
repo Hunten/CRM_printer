@@ -657,7 +657,35 @@ class PrinterServiceCRM:
 
     def _init_sheet(self):
         """Ensure headers exist and compute next_order_id."""
-        df = self._read_df(raw=True, ttl=0)
+        
+        # Determine next available SRV number (fill-the-gap logic)
+        existing = []
+        
+        for oid in df["order_id"]:
+            try:
+                if str(oid).startswith("SRV-"):
+                    num = int(str(oid).split("-")[1])
+                    existing.append(num)
+            except:
+                continue
+        
+        if not existing:
+            self.next_order_id = 1
+        else:
+            existing_sorted = sorted(existing)
+        
+            # Find first missing integer starting from 1
+            missing = None
+            for i in range(1, existing_sorted[-1] + 1):
+                if i not in existing_sorted:
+                    missing = i
+                    break
+        
+            if missing:
+                self.next_order_id = missing
+            else:
+                self.next_order_id = existing_sorted[-1] + 1
+
         if df is None or df.empty:
             columns = [
                 "order_id", "client_name", "client_phone", "client_email",
@@ -1145,12 +1173,45 @@ def main():
                     colp_r1, colp_r2 = st.columns(2)
                     with colp_r1:
                         if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
-                            st.session_state[state_key] = [
-                                p for p, flag in zip(current_printers, remove_flags) if not flag
-                            ]
-                            if not st.session_state[state_key]:
-                                st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
-                            st.rerun()
+                        # 1) Ștergere locală
+                        st.session_state[state_key] = [
+                            p for p, flag in zip(current_printers, remove_flags) if not flag
+                        ]
+                        if not st.session_state[state_key]:
+                            st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
+                    
+                        # 2) Regenerăm JSON-ul pentru spreadsheet
+                        printers_clean = []
+                        for p in st.session_state[state_key]:
+                            brand = safe_text(p.get("brand", "")).strip()
+                            model = safe_text(p.get("model", "")).strip()
+                            serial = safe_text(p.get("serial", "")).strip()
+                            if brand or model or serial:
+                                printers_clean.append({
+                                    "brand": brand,
+                                    "model": model,
+                                    "serial": serial,
+                                })
+                    
+                        printers_json = json.dumps(printers_clean, ensure_ascii=False)
+                    
+                        # 3) Actualizăm și câmpurile legacy
+                        fb, fm, fs = "", "", ""
+                        if printers_clean:
+                            fb, fm, fs = printers_clean[0]["brand"], printers_clean[0]["model"], printers_clean[0]["serial"]
+                    
+                        # 4) Scriem în spreadsheet imediat
+                        crm.update_order(selected_order_id,
+                            printers_json=printers_json,
+                            printer_brand=fb,
+                            printer_model=fm,
+                            printer_serial=fs
+                        )
+                    
+                        # 5) Reafișăm pagina
+                        st.success("🗑 Imprimantele selectate au fost șterse!")
+                        st.rerun()
+
                     with colp_r2:
                         if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
                             st.session_state[state_key].append({"brand": "", "model": "", "serial": ""})
