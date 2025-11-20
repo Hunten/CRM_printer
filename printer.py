@@ -724,27 +724,11 @@ class PrinterServiceCRM:
             st.sidebar.error(f"❌ Error saving to Google Sheets: {e}")
             return False
 
-        new_order = pd.DataFrame([{
-            "order_id": order_id,
-            "client_name": client_name,
-            "client_phone": client_phone,
-            "client_email": client_email,
-            "printers_json": json.dumps(printers_json),
-            "issue_description": issue_description,
-            "accessories": accessories,
-            "notes": notes,
-            "date_received": date_received.strftime("%Y-%m-%d") if date_received else datetime.now().strftime("%Y-%m-%d"),
-            "date_pickup_scheduled": date_pickup.strftime("%Y-%m-%d") if date_pickup else "",
-            "date_completed": "",
-            "date_picked_up": "",
-            "status": "Received",
-            "technician": "",
-            "repair_details": "",
-            "parts_used": "",
-            "labor_cost": 0.0,
-            "parts_cost": 0.0,
-            "total_cost": 0.0,
-        }])
+        def create_service_order(
+            self, client_name, client_phone, client_email,
+            printers_json,  # list of dicts: {brand, model, serial}
+            issue_description, accessories, notes, date_received, date_pickup
+        ):
 
         order_id = f"SRV-{self.next_order_id:05d}"
 
