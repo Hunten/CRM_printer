@@ -655,26 +655,66 @@ class PrinterServiceCRM:
         self.next_order_id = 1
         self._init_sheet()
 
-    def _init_sheet(self):
-        """Ensure headers exist and compute next_order_id."""
+        def _init_sheet(self):
+            """Ensure headers exist and compute next_order_id with fill-the-gap logic."""
+            df = self._read_df(raw=True, ttl=0)
         
-        # Determine next available SRV number (fill-the-gap logic)
-        existing = []
+            # CASE 1 — Sheet is missing or fully empty → create new sheet
+            if df is None or df.empty:
+                columns = [
+                    "order_id", "client_name", "client_phone", "client_email",
+                    "printer_brand", "printer_model", "printer_serial",
+                    "printers_json",
+                    "issue_description", "accessories", "notes",
+                    "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
+                    "status", "technician", "repair_details", "parts_used",
+                    "labor_cost", "parts_cost", "total_cost",
+                ]
+                df = pd.DataFrame(columns=columns)
+                self._write_df(df, allow_empty=False)
+                self.next_order_id = 1
+                return
         
-        for oid in df["order_id"]:
-            try:
-                if str(oid).startswith("SRV-"):
-                    num = int(str(oid).split("-")[1])
-                    existing.append(num)
-            except:
-                continue
+            # CASE 2 — Sheet exists but order_id column is missing → recreate sheet header
+            if "order_id" not in df.columns:
+                columns = [
+                    "order_id", "client_name", "client_phone", "client_email",
+                    "printer_brand", "printer_model", "printer_serial",
+                    "printers_json",
+                    "issue_description", "accessories", "notes",
+                    "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
+                    "status", "technician", "repair_details", "parts_used",
+                    "labor_cost", "parts_cost", "total_cost",
+                ]
+                new_df = pd.DataFrame(columns=columns)
+                self._write_df(new_df, allow_empty=False)
+                self.next_order_id = 1
+                return
         
-        if not existing:
-            self.next_order_id = 1
-        else:
+            # CASE 3 — Ensure printers_json exists
+            if "printers_json" not in df.columns:
+                df["printers_json"] = ""
+                self._write_df(df, allow_empty=False)
+        
+            # CASE 4 — Determine next order ID with fill-the-gap logic
+            existing = []
+        
+            for oid in df["order_id"]:
+                try:
+                    if isinstance(oid, str) and oid.startswith("SRV-"):
+                        num = int(oid.split("-")[1])
+                        existing.append(num)
+                except:
+                    continue
+        
+            # CASE 4A — No existing IDs → start fresh
+            if not existing:
+                self.next_order_id = 1
+                return
+        
             existing_sorted = sorted(existing)
         
-            # Find first missing integer starting from 1
+            # CASE 4B — Find the first missing ID
             missing = None
             for i in range(1, existing_sorted[-1] + 1):
                 if i not in existing_sorted:
@@ -684,57 +724,9 @@ class PrinterServiceCRM:
             if missing:
                 self.next_order_id = missing
             else:
+                # No gaps → next is max + 1
                 self.next_order_id = existing_sorted[-1] + 1
 
-        if df is None or df.empty:
-            columns = [
-                "order_id", "client_name", "client_phone", "client_email",
-                "printer_brand", "printer_model", "printer_serial",
-                "printers_json",  # NEW column
-                "issue_description", "accessories", "notes",
-                "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
-                "status", "technician", "repair_details", "parts_used",
-                "labor_cost", "parts_cost", "total_cost",
-            ]
-            df = pd.DataFrame(columns=columns)
-            self._write_df(df, allow_empty=False)
-            self.next_order_id = 1
-        else:
-            # Ensure printers_json exists for old sheets
-            if "printers_json" not in df.columns:
-                df["printers_json"] = ""
-                self._write_df(df, allow_empty=False)
-
-            if "order_id" in df.columns and not df["order_id"].isna().all():
-                try:
-                    max_id = max(
-                        int(str(oid).split("-")[1])
-                        for oid in df["order_id"]
-                        if str(oid).startswith("SRV-")
-                    )
-                    self.next_order_id = max_id + 1
-                except Exception:
-                    self.next_order_id = 1
-            else:
-                self.next_order_id = 1
-
-    def _read_df(self, raw: bool = False, ttl: int = 60) -> pd.DataFrame | None:
-        """Read sheet with caching (ttl in seconds)."""
-        try:
-            df = self.conn.read(worksheet=self.worksheet, ttl=ttl)
-            if df is None:
-                return None
-            if raw:
-                return df
-            if df.empty:
-                return pd.DataFrame()
-            for col in ["labor_cost", "parts_cost", "total_cost"]:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-            return df
-        except Exception as e:
-            st.sidebar.error(f"❌ Error reading from Google Sheets: {e}")
-            return None if raw else pd.DataFrame()
 
     def _write_df(self, df: pd.DataFrame, allow_empty: bool = False) -> bool:
         """Write entire DataFrame to Sheets. Prevents accidental data loss."""
