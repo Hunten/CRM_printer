@@ -13,7 +13,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 from PIL import Image
-import json  # ✅ NEW: for multiple printers JSON
+import json  # For multiple printers JSON
 
 
 # ============================================================================
@@ -198,7 +198,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     buffer = io.BytesIO()
     width, height = 210*mm, 148.5*mm
     c = canvas.Canvas(buffer, pagesize=(width, height))
-    
+
     # Logo cu calitate maximă - FIX: use logo_image not logo_buffer
     header_y_start = height-10*mm
     x_business = 10*mm
@@ -222,20 +222,20 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     # Logo cu calitate maximă - middle - FIX: use logo_image
     logo_x = 85*mm
     logo_y = header_y_start-20*mm
-    
+
     if logo_image:
         try:
             logo_image.seek(0)
             img = Image.open(logo_image)
-            
+
             target_width_mm = 40
             aspect_ratio = img.height / img.width
             target_height_mm = target_width_mm * aspect_ratio
-            
+
             if target_height_mm > 25:
                 target_height_mm = 25
                 target_width_mm = target_height_mm / aspect_ratio
-            
+
             logo_image.seek(0)
             c.drawImage(
                 ImageReader(logo_image), 
@@ -258,7 +258,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 10)
         c.drawCentredString(logo_x+20*mm, logo_y+12.5*mm, "[LOGO]")
-    
+
     # Client info - right side
     c.setFillColor(colors.black)
     x_client = 155*mm
@@ -389,11 +389,11 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     buffer = io.BytesIO()
     width, height = 210*mm, 148.5*mm
     c = canvas.Canvas(buffer, pagesize=(width, height))
-    
+
     header_y_start = height-10*mm
     x_business = 10*mm
     y_pos = header_y_start
-    
+
     # Company info - left side
     c.setFont("Helvetica-Bold", 9)
     c.drawString(x_business, y_pos, remove_diacritics(company_info.get('company_name','')))
@@ -408,24 +408,24 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_business, y_pos, f"Tel: {company_info.get('phone','')}")
     y_pos -= 3*mm
     c.drawString(x_business, y_pos, f"Email: {company_info.get('email','')}")
-    
+
     # Logo cu calitate maximă - middle - FIX: use logo_image
     logo_x = 85*mm
     logo_y = header_y_start-20*mm
-    
+
     if logo_image:
         try:
             logo_image.seek(0)
             img = Image.open(logo_image)
-            
+
             target_width_mm = 40
             aspect_ratio = img.height / img.width
             target_height_mm = target_width_mm * aspect_ratio
-            
+
             if target_height_mm > 25:
                 target_height_mm = 25
                 target_width_mm = target_height_mm / aspect_ratio
-            
+
             logo_image.seek(0)
             c.drawImage(
                 ImageReader(logo_image), 
@@ -448,7 +448,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 10)
         c.drawCentredString(logo_x+20*mm, logo_y+12.5*mm, "[LOGO]")
-    
+
     # Client info - right side
     c.setFillColor(colors.black)
     x_client = 155*mm
@@ -460,7 +460,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.drawString(x_client, y_pos, f"Nume: {remove_diacritics(safe_text(order.get('client_name','')))}")
     y_pos -= 3*mm
     c.drawString(x_client, y_pos, f"Tel: {safe_text(order.get('client_phone',''))}")
-    
+
     # Title
     title_y = height-38*mm
     c.setFont("Helvetica-Bold", 12)
@@ -512,7 +512,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     if accessories and accessories.strip():
         y_pos -= 4*mm
         c.drawString(x_left, y_pos, f"Accesorii: {remove_diacritics(accessories)}")
-    
+
     # MIDDLE COLUMN - Repairs
     x_middle = 73*mm
     y_pos = y_start
@@ -589,7 +589,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.setFont("Helvetica-Bold", 8)
     c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Descriere")
     c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, "Suma (RON)")
-    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row-height)
 
     y_cost -= row_height
 
@@ -597,15 +597,15 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.setFont("Helvetica", 8)
     c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Manopera")
     labor = safe_float(order.get('labor_cost',0))
-    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{labor:.2f}")
-    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
+    c.drawString(table_x+table_width-22*mm, y_cost-row-height+1.5*mm, f"{labor:.2f}")
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row-height)
     y_cost -= row_height
 
     # Parts row
     c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "Piese")
     parts = safe_float(order.get('parts_cost',0))
-    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{parts:.2f}")
-    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row_height)
+    c.drawString(table_x+table_width-22*mm, y_cost-row-height+1.5*mm, f"{parts:.2f}")
+    c.line(table_x, y_cost-row_height, table_x+table_width, y_cost-row-height)
     y_cost -= row_height
 
     # Total row
@@ -613,9 +613,9 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     c.rect(table_x, y_cost-row_height, table_width, row_height, fill=1)
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(table_x+2*mm, y_cost-row_height+1.5*mm, "TOTAL")
+    c.drawString(table_x+2*mm, y_cost-row-height+1.5*mm, "TOTAL")
     total = safe_float(order.get('total_cost', labor+parts))
-    c.drawString(table_x+table_width-22*mm, y_cost-row_height+1.5*mm, f"{total:.2f}")
+    c.drawString(table_x+table_width-22*mm, y_cost-row-height+1.5*mm, f"{total:.2f}")
 
     # Signature boxes
     sig_y = 22*mm
@@ -629,7 +629,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
 
     c.rect(115*mm, sig_y, 85*mm, sig_height)
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(117*mm, sig_y+sig_height-3*mm, "CLIENT")
+    c.drawString(117*mm, sig_y+sig-height-3*mm, "CLIENT")
     c.setFont("Helvetica", 7)
     c.drawString(117*mm, sig_y+sig_height-7*mm, "Am luat la cunostinta")
     c.drawString(117*mm, sig_y+2*mm, "Semnatura")
@@ -662,7 +662,7 @@ class PrinterServiceCRM:
             columns = [
                 "order_id", "client_name", "client_phone", "client_email",
                 "printer_brand", "printer_model", "printer_serial",
-                "printers_json",  # ✅ NEW column
+                "printers_json",  # NEW column
                 "issue_description", "accessories", "notes",
                 "date_received", "date_pickup_scheduled", "date_completed", "date_picked_up",
                 "status", "technician", "repair_details", "parts_used",
@@ -672,7 +672,7 @@ class PrinterServiceCRM:
             self._write_df(df, allow_empty=False)
             self.next_order_id = 1
         else:
-            # Asigura existenta coloanei printers_json pentru sheet-uri deja existente
+            # Ensure printers_json exists for old sheets
             if "printers_json" not in df.columns:
                 df["printers_json"] = ""
                 self._write_df(df, allow_empty=False)
@@ -726,12 +726,12 @@ class PrinterServiceCRM:
 
     def create_service_order(
         self, client_name, client_phone, client_email,
-        printers,  # ✅ list of dicts: {brand, model, serial}
+        printers,  # list of dicts: {brand, model, serial}
         issue_description, accessories, notes, date_received, date_pickup
     ):
         order_id = f"SRV-{self.next_order_id:05d}"
 
-        # Prima imprimanta pentru coloanele legacy
+        # First printer for legacy columns
         first_brand = ""
         first_model = ""
         first_serial = ""
@@ -877,7 +877,7 @@ def main():
 
     # Tab navigation
     tab_titles = ["📥 New Order", "📋 All Orders", "✏️ Update Order", "📊 Reports"]
-    
+
     cols = st.columns(4)
     for idx, (col, title) in enumerate(zip(cols, tab_titles)):
         with col:
@@ -892,9 +892,9 @@ def main():
     # TAB 0: NEW ORDER
     if active_tab == 0:
         st.header("Create New Service Order")
-        
+
         if not st.session_state["last_created_order"] or st.session_state["pdf_downloaded"]:
-            # Asigura lista temporara de imprimante
+            # Ensure temp_printers exists
             if "temp_printers" not in st.session_state or not st.session_state["temp_printers"]:
                 st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
 
@@ -912,14 +912,13 @@ def main():
 
                 st.subheader("Printers in This Order")
 
-                # MULTI-PRINTER UI
                 printers_list = st.session_state["temp_printers"]
+                remove_flags = []
 
                 # Draw each printer row
-                remove_indices = []
                 for i, p in enumerate(printers_list):
                     st.markdown(f"**Printer #{i+1}**")
-                    colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.5])
+                    colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.6])
                     with colA:
                         p["brand"] = st.text_input(f"Brand #{i+1} *", value=p["brand"], key=f"new_printer_brand_{i}")
                     with colB:
@@ -927,30 +926,36 @@ def main():
                     with colC:
                         p["serial"] = st.text_input(f"Serial #{i+1}", value=p["serial"], key=f"new_printer_serial_{i}")
                     with colD:
-                        if st.button("❌", key=f"new_remove_printer_{i}"):
-                            remove_indices.append(i)
-
-                # Remove printers marked
-                if remove_indices:
-                    for idx_rm in sorted(remove_indices, reverse=True):
-                        if 0 <= idx_rm < len(st.session_state["temp_printers"]):
-                            st.session_state["temp_printers"].pop(idx_rm)
-                    if not st.session_state["temp_printers"]:
-                        st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
-                    st.rerun()
-
-                if st.button("➕ Add another printer", key="new_add_printer"):
-                    st.session_state["temp_printers"].append({"brand": "", "model": "", "serial": ""})
-                    st.rerun()
+                        remove_flags.append(
+                            st.checkbox("Remove", key=f"new_printer_remove_{i}")
+                        )
 
                 issue_description = st.text_area("Issue Description *", height=100, key="new_issue_description")
                 accessories = st.text_input("Accessories (cables, cartridges, etc.)", key="new_accessories")
                 notes = st.text_area("Additional Notes", height=60, key="new_notes")
 
-                submit = st.form_submit_button("🎫 Create Order", type="primary", use_container_width=True)
+                col_btn1, col_btn2, col_btn3 = st.columns(3)
+                with col_btn1:
+                    remove_clicked = st.form_submit_button("🗑 Remove selected printers")
+                with col_btn2:
+                    add_clicked = st.form_submit_button("➕ Add another printer")
+                with col_btn3:
+                    submit = st.form_submit_button("🎫 Create Order", type="primary", use_container_width=True)
+
+                if remove_clicked:
+                    st.session_state["temp_printers"] = [
+                        p for p, flag in zip(printers_list, remove_flags) if not flag
+                    ]
+                    if not st.session_state["temp_printers"]:
+                        st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
+                    st.rerun()
+
+                if add_clicked:
+                    st.session_state["temp_printers"].append({"brand": "", "model": "", "serial": ""})
+                    st.rerun()
 
                 if submit:
-                    # Curata lista de imprimante - doar cele completate
+                    # Clean printers list
                     printers_clean = []
                     for p in st.session_state["temp_printers"]:
                         brand = safe_text(p.get("brand", "")).strip()
@@ -976,7 +981,7 @@ def main():
                         if order_id:
                             st.session_state["last_created_order"] = order_id
                             st.session_state["pdf_downloaded"] = False
-                            # reset temp printers pentru urmatoarea comanda
+                            # Reset temp printers
                             st.session_state["temp_printers"] = [{"brand": "", "model": "", "serial": ""}]
                             st.success(f"✅ Order Created: **{order_id}**")
                             st.balloons()
@@ -990,11 +995,11 @@ def main():
                 st.divider()
                 st.success(f"✅ Order Created: **{order['order_id']}**")
                 st.subheader("📄 Download Receipt")
-                
-                # FIX: Get logo from session state
+
+                # Get logo from session state
                 logo = st.session_state.get("logo_image", None)
                 pdf_buffer = generate_initial_receipt_pdf(order, st.session_state["company_info"], logo)
-                
+
                 if st.download_button(
                     "📄 Download Initial Receipt",
                     pdf_buffer,
@@ -1020,7 +1025,7 @@ def main():
             col4.metric("🎉 Completed", len(df[df["status"] == "Completed"]))
 
             st.markdown("**Click on a row to edit that order:**")
-            
+
             event = st.dataframe(
                 df[["order_id", "client_name", "printer_brand", "date_received", "status", "total_cost"]],
                 use_container_width=True,
@@ -1028,11 +1033,11 @@ def main():
                 on_select="rerun",
                 key="orders_table"
             )
-            
+
             if event and "selection" in event and event["selection"]["rows"]:
                 selected_idx = event["selection"]["rows"][0]
                 selected_order_id = df.iloc[selected_idx]["order_id"]
-                
+
                 st.session_state["selected_order_for_update"] = selected_order_id
                 st.session_state["previous_selected_order"] = selected_order_id
                 st.session_state["active_tab"] = 2
@@ -1054,19 +1059,19 @@ def main():
     # TAB 2: UPDATE ORDER
     elif active_tab == 2:
         st.header("Update Service Order")
-        
+
         df = df_all_orders
 
         if not df.empty:
             available_orders = df["order_id"].tolist()
-            
+
             default_idx = 0
             if st.session_state["selected_order_for_update"] in available_orders:
                 default_idx = available_orders.index(st.session_state["selected_order_for_update"])
-            
+
             def on_order_select():
                 st.session_state["active_tab"] = 2
-            
+
             selected_order_id = st.selectbox(
                 "Select Order",
                 available_orders,
@@ -1079,7 +1084,7 @@ def main():
             if selected_order_id:
                 df_fresh = crm._read_df(raw=True, ttl=0)
                 order_row = df_fresh[df_fresh["order_id"] == selected_order_id]
-                
+
                 if order_row.empty:
                     st.error("❌ Order not found in current data.")
                 else:
@@ -1107,10 +1112,10 @@ def main():
 
                     st.subheader("Printers in This Order")
 
-                    remove_indices = []
+                    remove_flags = []
                     for i, p in enumerate(current_printers):
                         st.markdown(f"**Printer #{i+1}**")
-                        colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.5])
+                        colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.6])
                         with colA:
                             p["brand"] = st.text_input(f"Brand #{i+1}", value=p["brand"], key=f"upd_brand_{selected_order_id}_{i}")
                         with colB:
@@ -1118,20 +1123,23 @@ def main():
                         with colC:
                             p["serial"] = st.text_input(f"Serial #{i+1}", value=p["serial"], key=f"upd_serial_{selected_order_id}_{i}")
                         with colD:
-                            if st.button("❌", key=f"upd_remove_printer_{selected_order_id}_{i}"):
-                                remove_indices.append(i)
+                            remove_flags.append(
+                                st.checkbox("Remove", key=f"upd_remove_printer_{selected_order_id}_{i}")
+                            )
 
-                    if remove_indices:
-                        for idx_rm in sorted(remove_indices, reverse=True):
-                            if 0 <= idx_rm < len(st.session_state[state_key]):
-                                st.session_state[state_key].pop(idx_rm)
-                        if not st.session_state[state_key]:
-                            st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
-                        st.rerun()
-
-                    if st.button("➕ Add another printer", key=f"upd_add_printer_{selected_order_id}"):
-                        st.session_state[state_key].append({"brand": "", "model": "", "serial": ""})
-                        st.rerun()
+                    colp_r1, colp_r2 = st.columns(2)
+                    with colp_r1:
+                        if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
+                            st.session_state[state_key] = [
+                                p for p, flag in zip(current_printers, remove_flags) if not flag
+                            ]
+                            if not st.session_state[state_key]:
+                                st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
+                            st.rerun()
+                    with colp_r2:
+                        if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
+                            st.session_state[state_key].append({"brand": "", "model": "", "serial": ""})
+                            st.rerun()
 
                     st.divider()
 
@@ -1196,7 +1204,7 @@ def main():
                     colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
 
                     if st.button("💾 Update Order", type="primary", key=f"update_order_btn_{selected_order_id}"):
-                        # Curata lista de imprimante pentru salvare
+                        # Clean printers list
                         printers_clean = []
                         for p in st.session_state[state_key]:
                             brand = safe_text(p.get("brand", "")).strip()
@@ -1247,9 +1255,9 @@ def main():
 
                     st.divider()
                     st.subheader("📄 Download Receipts")
-                    # FIX: Get logo from session state
+                    # Get logo from session state
                     logo = st.session_state.get("logo_image", None)
-                    
+
                     colp1, colp2 = st.columns(2)
                     with colp1:
                         st.markdown("**Initial Receipt**")
