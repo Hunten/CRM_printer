@@ -1232,7 +1232,7 @@ def main():
                             st.session_state[state_key] = printers_list
                     
                             # 4. Forțăm doar refresh-ul UI fără să reinițializăm orderul
-                            st.experimental_rerun()
+                            st.rerun()
 
 
                     st.divider()
