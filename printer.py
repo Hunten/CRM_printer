@@ -1222,8 +1222,18 @@ def main():
 
                     with colp_r2:
                         if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
-                            st.session_state[state_key].append({"brand": "", "model": "", "serial": ""})
-                            st.rerun()
+                            # 1. Luăm lista actuală din session_state
+                            printers_list = st.session_state.get(state_key, [])
+                    
+                            # 2. Adăugăm un nou printer gol
+                            printers_list.append({"brand": "", "model": "", "serial": ""})
+                    
+                            # 3. Salvăm în session_state FĂRĂ să dăm rerun
+                            st.session_state[state_key] = printers_list
+                    
+                            # 4. Forțăm doar refresh-ul UI fără să reinițializăm orderul
+                            st.experimental_rerun()
+
 
                     st.divider()
 
