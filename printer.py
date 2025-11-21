@@ -1180,15 +1180,54 @@ def main():
                     colp_r1, colp_r2 = st.columns(2)
                     with colp_r1:
                         if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
-                            # Marcăm pentru ștergere local (în UI)
-                            st.session_state[state_key] = [
-                                p for p, flag in zip(current_printers, remove_flags) if not flag
+                    
+                            # 1. Construim lista ACTUALĂ din UI (brand/model/serial citite din input)
+                            updated_list = []
+                            for i, p in enumerate(current_printers):
+                                brand = st.session_state.get(f"upd_brand_{selected_order_id}_{i}", "").strip()
+                                model = st.session_state.get(f"upd_model_{selected_order_id}_{i}", "").strip()
+                                serial = st.session_state.get(f"upd_serial_{selected_order_id}_{i}", "").strip()
+                    
+                                updated_list.append({
+                                    "brand": brand,
+                                    "model": model,
+                                    "serial": serial,
+                                })
+                    
+                            # 2. Aplicăm REMOVE pe baza checkbox-urilor
+                            updated_list = [
+                                p for p, flag in zip(updated_list, remove_flags) if not flag
                             ]
-                            if not st.session_state[state_key]:
-                                st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
+                    
+                            # 3. Dacă nu rămâne nici o imprimantă → punem un placeholder
+                            if not updated_list:
+                                updated_list = [{"brand": "", "model": "", "serial": ""}]
+                    
+                            # 4. Scriem imediat în session_state, pentru UI
+                            st.session_state[state_key] = updated_list
+                    
+                            # 5. Construim JSON pentru Google Sheets
+                            printers_json = json.dumps(updated_list, ensure_ascii=False)
+                    
+                            # 6. Actualizăm primul printer (legacy columns)
+                            first_brand = updated_list[0]["brand"]
+                            first_model = updated_list[0]["model"]
+                            first_serial = updated_list[0]["serial"]
+                    
+                            # 7. Salvăm în Google Sheets IMEDIAT
+                            updates = {
+                                "printers_json": printers_json,
+                                "printer_brand": first_brand,
+                                "printer_model": first_model,
+                                "printer_serial": first_serial,
+                            }
+                    
+                            if crm.update_order(selected_order_id, **updates):
+                                st.success("🗑 Imprimantele selectate au fost șterse definitiv.")
+                                st.rerun()
+                            else:
+                                st.error("❌ Eroare la salvarea în Google Sheets!")
 
-                            st.success("🗑 Imprimantele selectate au fost marcate pentru ștergere. Apasă „Update Order” pentru a salva în foaia Google.")
-                            st.rerun()
 
                     with colp_r2:
                         if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
