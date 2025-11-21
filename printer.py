@@ -1180,60 +1180,23 @@ def main():
                     colp_r1, colp_r2 = st.columns(2)
                     with colp_r1:
                         if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
-                            # 1) Ștergere locală
+                            # Marcăm pentru ștergere local (în UI)
                             st.session_state[state_key] = [
                                 p for p, flag in zip(current_printers, remove_flags) if not flag
                             ]
                             if not st.session_state[state_key]:
                                 st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
 
-                            # 2) Regenerăm JSON-ul pentru spreadsheet
-                            printers_clean = []
-                            for p in st.session_state[state_key]:
-                                brand = safe_text(p.get("brand", "")).strip()
-                                model = safe_text(p.get("model", "")).strip()
-                                serial = safe_text(p.get("serial", "")).strip()
-                                if brand or model or serial:
-                                    printers_clean.append({
-                                        "brand": brand,
-                                        "model": model,
-                                        "serial": serial,
-                                    })
-
-                            printers_json = json.dumps(printers_clean, ensure_ascii=False)
-
-                            # 3) Actualizăm și câmpurile legacy
-                            fb, fm, fs = "", "", ""
-                            if printers_clean:
-                                fb, fm, fs = printers_clean[0]["brand"], printers_clean[0]["model"], printers_clean[0]["serial"]
-
-                            # 4) Scriem în spreadsheet imediat
-                            crm.update_order(
-                                selected_order_id,
-                                printers_json=printers_json,
-                                printer_brand=fb,
-                                printer_model=fm,
-                                printer_serial=fs
-                            )
-
-                            # 5) Reafișăm pagina
-                            st.success("🗑 Imprimantele selectate au fost șterse!")
+                            st.success("🗑 Imprimantele selectate au fost marcate pentru ștergere. Apasă „Update Order” pentru a salva în foaia Google.")
                             st.rerun()
 
                     with colp_r2:
                         if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
-                            # 1. Luăm lista actuală din session_state
+                            # Adăugăm un nou printer gol în state și reafișăm UI-ul
                             printers_list = st.session_state.get(state_key, [])
-                    
-                            # 2. Adăugăm un nou printer gol
                             printers_list.append({"brand": "", "model": "", "serial": ""})
-                    
-                            # 3. Salvăm în session_state FĂRĂ să dăm rerun
                             st.session_state[state_key] = printers_list
-                    
-                            # 4. Forțăm doar refresh-ul UI fără să reinițializăm orderul
                             st.rerun()
-
 
                     st.divider()
 
@@ -1298,7 +1261,7 @@ def main():
                     colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
 
                     if st.button("💾 Update Order", type="primary", key=f"update_order_btn_{selected_order_id}"):
-                        # Clean printers list
+                        # Clean printers list (inclusiv ce ai șters sau adăugat în UI)
                         printers_clean = []
                         for p in st.session_state[state_key]:
                             brand = safe_text(p.get("brand", "")).strip()
