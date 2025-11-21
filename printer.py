@@ -14,6 +14,7 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 from PIL import Image
 import json  # For multiple printers JSON
+from typing import Optional
 
 
 # ============================================================================
@@ -42,6 +43,9 @@ if "logo_image" not in st.session_state:
 # Initialize session state
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = 0
+
+if "last_tab" not in st.session_state:
+    st.session_state["last_tab"] = 0
 
 if "selected_order_for_update" not in st.session_state:
     st.session_state["selected_order_for_update"] = None
@@ -219,7 +223,7 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
     y_pos -= 3*mm
     c.drawString(x_business, y_pos, f"Email: {company_info.get('email','')}")
 
-    # Logo cu calitate maximă - middle - FIX: use logo_image
+    # Logo middle
     logo_x = 85*mm
     logo_y = header_y_start-20*mm
 
@@ -238,12 +242,12 @@ def generate_initial_receipt_pdf(order, company_info, logo_image=None):
 
             logo_image.seek(0)
             c.drawImage(
-                ImageReader(logo_image), 
-                logo_x, 
-                logo_y, 
-                width=target_width_mm*mm, 
-                height=target_height_mm*mm, 
-                preserveAspectRatio=True, 
+                ImageReader(logo_image),
+                logo_x,
+                logo_y,
+                width=target_width_mm*mm,
+                height=target_height_mm*mm,
+                preserveAspectRatio=True,
                 mask='auto'
             )
         except Exception:
@@ -409,7 +413,7 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
     y_pos -= 3*mm
     c.drawString(x_business, y_pos, f"Email: {company_info.get('email','')}")
 
-    # Logo cu calitate maximă - middle - FIX: use logo_image
+    # Logo middle
     logo_x = 85*mm
     logo_y = header_y_start-20*mm
 
@@ -428,12 +432,12 @@ def generate_completion_receipt_pdf(order, company_info, logo_image=None):
 
             logo_image.seek(0)
             c.drawImage(
-                ImageReader(logo_image), 
-                logo_x, 
-                logo_y, 
-                width=target_width_mm*mm, 
-                height=target_height_mm*mm, 
-                preserveAspectRatio=True, 
+                ImageReader(logo_image),
+                logo_x,
+                logo_y,
+                width=target_width_mm*mm,
+                height=target_height_mm*mm,
+                preserveAspectRatio=True,
                 mask='auto'
             )
         except Exception:
@@ -655,7 +659,7 @@ class PrinterServiceCRM:
         self.next_order_id = 1
         self._init_sheet()
 
-    def _read_df(self, raw: bool = True, ttl: int = 0) -> pd.DataFrame | None:
+    def _read_df(self, raw: bool = True, ttl: int = 0) -> Optional[pd.DataFrame]:
         """Read Google Sheets into DataFrame safely."""
         try:
             df = self.conn.read(
@@ -933,6 +937,8 @@ def main():
                 use_container_width=True,
                 type="primary" if st.session_state["active_tab"] == idx else "secondary",
             ):
+                # memorează de pe ce tab vii
+                st.session_state["last_tab"] = st.session_state["active_tab"]
                 st.session_state["active_tab"] = idx
                 st.rerun()
 
@@ -941,6 +947,11 @@ def main():
 
     # TAB 0: NEW ORDER
     if active_tab == 0:
+        # dacă vii din alt tab, resetează starea de "ultimul order"
+        if st.session_state.get("last_tab") != 0:
+            st.session_state["last_created_order"] = None
+            st.session_state["pdf_downloaded"] = False
+
         st.header("Create New Service Order")
 
         if not st.session_state["last_created_order"] or st.session_state["pdf_downloaded"]:
@@ -958,6 +969,7 @@ def main():
                 with col2:
                     st.subheader("Order Dates")
                     date_received = st.date_input("Date Received *", value=date.today(), key="new_date_received")
+                    # dacă vrei, poți pune aici value=date.today() în loc de None
                     date_pickup = st.date_input("Scheduled Pickup (optional)", value=None, key="new_date_pickup")
 
                 st.subheader("Printers in This Order")
@@ -1133,254 +1145,254 @@ def main():
 
             if selected_order_id:
                 df_fresh = crm._read_df(raw=True, ttl=0)
-                order_row = df_fresh[df_fresh["order_id"] == selected_order_id]
-
-                if order_row.empty:
-                    st.error("❌ Order not found in current data.")
+                if df_fresh is None or df_fresh.empty:
+                    st.error("❌ Error reading current data from Google Sheets.")
                 else:
-                    order = order_row.iloc[0].to_dict()
+                    order_row = df_fresh[df_fresh["order_id"] == selected_order_id]
 
-                    # load printers for this order
-                    printers_initial = load_printers_from_order(order)
-                    state_key = f"upd_printers_{selected_order_id}"
-                    if state_key not in st.session_state:
-                        st.session_state[state_key] = printers_initial if printers_initial else [{"brand": "", "model": "", "serial": ""}]
-                    current_printers = st.session_state[state_key]
+                    if order_row.empty:
+                        st.error("❌ Order not found in current data.")
+                    else:
+                        order = order_row.iloc[0].to_dict()
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**Client:** {safe_text(order.get('client_name'))}")
-                        st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
-                        st.write(f"**Printer (main):** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
-                        st.write(f"**Serial (main):** {safe_text(order.get('printer_serial'))}")
-                    with col2:
-                        st.write(f"**Received:** {safe_text(order.get('date_received'))}")
-                        st.write(f"**Issue:** {safe_text(order.get('issue_description'))}")
-                        st.write(f"**Accessories:** {safe_text(order.get('accessories'))}")
+                        # load printers for this order
+                        printers_initial = load_printers_from_order(order)
+                        state_key = f"upd_printers_{selected_order_id}"
+                        if state_key not in st.session_state:
+                            st.session_state[state_key] = printers_initial if printers_initial else [{"brand": "", "model": "", "serial": ""}]
+                        current_printers = st.session_state[state_key]
 
-                    st.divider()
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Client:** {safe_text(order.get('client_name'))}")
+                            st.write(f"**Phone:** {safe_text(order.get('client_phone'))}")
+                            st.write(f"**Printer (main):** {safe_text(order.get('printer_brand'))} {safe_text(order.get('printer_model'))}")
+                            st.write(f"**Serial (main):** {safe_text(order.get('printer_serial'))}")
+                        with col2:
+                            st.write(f"**Received:** {safe_text(order.get('date_received'))}")
+                            st.write(f"**Issue:** {safe_text(order.get('issue_description'))}")
+                            st.write(f"**Accessories:** {safe_text(order.get('accessories'))}")
 
-                    st.subheader("Printers in This Order")
+                        st.divider()
 
-                    remove_flags = []
-                    for i, p in enumerate(current_printers):
-                        st.markdown(f"**Printer #{i+1}**")
-                        colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.6])
-                        with colA:
-                            p["brand"] = st.text_input(f"Brand #{i+1}", value=p["brand"], key=f"upd_brand_{selected_order_id}_{i}")
-                        with colB:
-                            p["model"] = st.text_input(f"Model #{i+1}", value=p["model"], key=f"upd_model_{selected_order_id}_{i}")
-                        with colC:
-                            p["serial"] = st.text_input(f"Serial #{i+1}", value=p["serial"], key=f"upd_serial_{selected_order_id}_{i}")
-                        with colD:
-                            remove_flags.append(
-                                st.checkbox("Remove", key=f"upd_remove_printer_{selected_order_id}_{i}")
+                        st.subheader("Printers in This Order")
+
+                        remove_flags = []
+                        for i, p in enumerate(current_printers):
+                            st.markdown(f"**Printer #{i+1}**")
+                            colA, colB, colC, colD = st.columns([1.2, 1.2, 1.2, 0.6])
+                            with colA:
+                                p["brand"] = st.text_input(f"Brand #{i+1}", value=p["brand"], key=f"upd_brand_{selected_order_id}_{i}")
+                            with colB:
+                                p["model"] = st.text_input(f"Model #{i+1}", value=p["model"], key=f"upd_model_{selected_order_id}_{i}")
+                            with colC:
+                                p["serial"] = st.text_input(f"Serial #{i+1}", value=p["serial"], key=f"upd_serial_{selected_order_id}_{i}")
+                            with colD:
+                                remove_flags.append(
+                                    st.checkbox("Remove", key=f"upd_remove_printer_{selected_order_id}_{i}")
+                                )
+
+                        colp_r1, colp_r2 = st.columns(2)
+                        with colp_r1:
+                            if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
+                                # 1) Ștergere locală
+                                st.session_state[state_key] = [
+                                    p for p, flag in zip(current_printers, remove_flags) if not flag
+                                ]
+                                if not st.session_state[state_key]:
+                                    st.session_state[state_key] = [{"brand": "", "model": "", "serial": ""}]
+
+                                # 2) Regenerăm JSON-ul pentru spreadsheet
+                                printers_clean = []
+                                for p in st.session_state[state_key]:
+                                    brand = safe_text(p.get("brand", "")).strip()
+                                    model = safe_text(p.get("model", "")).strip()
+                                    serial = safe_text(p.get("serial", "")).strip()
+                                    if brand or model or serial:
+                                        printers_clean.append({
+                                            "brand": brand,
+                                            "model": model,
+                                            "serial": serial,
+                                        })
+
+                                printers_json = json.dumps(printers_clean, ensure_ascii=False)
+
+                                # 3) Actualizăm și câmpurile legacy
+                                fb, fm, fs = "", "", ""
+                                if printers_clean:
+                                    fb, fm, fs = printers_clean[0]["brand"], printers_clean[0]["model"], printers_clean[0]["serial"]
+
+                                # 4) Scriem în spreadsheet imediat
+                                crm.update_order(
+                                    selected_order_id,
+                                    printers_json=printers_json,
+                                    printer_brand=fb,
+                                    printer_model=fm,
+                                    printer_serial=fs
+                                )
+
+                                # 5) Reafișăm pagina
+                                st.success("🗑 Imprimantele selectate au fost șterse!")
+                                st.rerun()
+
+                        with colp_r2:
+                            if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
+                                printers_list = st.session_state.get(state_key, [])
+                                printers_list.append({"brand": "", "model": "", "serial": ""})
+                                st.session_state[state_key] = printers_list
+                                st.rerun()
+
+                        st.divider()
+
+                        status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
+                        current_status = safe_text(order.get("status")) or "Received"
+                        if current_status not in status_options:
+                            current_status = "Received"
+                        status_index = status_options.index(current_status)
+
+                        new_status = st.selectbox(
+                            "Status",
+                            status_options,
+                            index=status_index,
+                            key=f"update_status_{selected_order_id}",
+                        )
+
+                        if new_status == "Completed":
+                            actual_pickup_date = st.date_input(
+                                "Actual Pickup Date",
+                                value=date.today(),
+                                key=f"update_pickup_date_{selected_order_id}",
                             )
+                        else:
+                            actual_pickup_date = None
 
-                    colp_r1, colp_r2 = st.columns(2)
-                    with colp_r1:
-                        if st.button("🗑 Remove selected", key=f"upd_remove_selected_{selected_order_id}"):
-                    
-                            # 1. Construim lista ACTUALĂ din UI (brand/model/serial citite din input)
-                            updated_list = []
-                            for i, p in enumerate(current_printers):
-                                brand = st.session_state.get(f"upd_brand_{selected_order_id}_{i}", "").strip()
-                                model = st.session_state.get(f"upd_model_{selected_order_id}_{i}", "").strip()
-                                serial = st.session_state.get(f"upd_serial_{selected_order_id}_{i}", "").strip()
-                    
-                                updated_list.append({
-                                    "brand": brand,
-                                    "model": model,
-                                    "serial": serial,
-                                })
-                    
-                            # 2. Aplicăm REMOVE pe baza checkbox-urilor
-                            updated_list = [
-                                p for p, flag in zip(updated_list, remove_flags) if not flag
-                            ]
-                    
-                            # 3. Dacă nu rămâne nici o imprimantă → punem un placeholder
-                            if not updated_list:
-                                updated_list = [{"brand": "", "model": "", "serial": ""}]
-                    
-                            # 4. Scriem imediat în session_state, pentru UI
-                            st.session_state[state_key] = updated_list
-                    
-                            # 5. Construim JSON pentru Google Sheets
-                            printers_json = json.dumps(updated_list, ensure_ascii=False)
-                    
-                            # 6. Actualizăm primul printer (legacy columns)
-                            first_brand = updated_list[0]["brand"]
-                            first_model = updated_list[0]["model"]
-                            first_serial = updated_list[0]["serial"]
-                    
-                            # 7. Salvăm în Google Sheets IMEDIAT
+                        st.subheader("Repair details")
+
+                        repair_details = st.text_area(
+                            "Repairs performed",
+                            value=safe_text(order.get("repair_details")),
+                            height=100,
+                            key=f"update_repair_details_{selected_order_id}",
+                        )
+
+                        parts_used = st.text_input(
+                            "Parts used",
+                            value=safe_text(order.get("parts_used")),
+                            key=f"update_parts_used_{selected_order_id}",
+                        )
+
+                        technician = st.text_input(
+                            "Technician",
+                            value=safe_text(order.get("technician")),
+                            key=f"update_technician_{selected_order_id}",
+                        )
+
+                        colc1, colc2, colc3 = st.columns(3)
+                        labor_cost = colc1.number_input(
+                            "Labor cost (RON)",
+                            value=safe_float(order.get("labor_cost")),
+                            min_value=0.0,
+                            step=10.0,
+                            key=f"update_labor_cost_{selected_order_id}",
+                        )
+                        parts_cost = colc2.number_input(
+                            "Parts cost (RON)",
+                            value=safe_float(order.get("parts_cost")),
+                            min_value=0.0,
+                            step=10.0,
+                            key=f"update_parts_cost_{selected_order_id}",
+                        )
+                        colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
+
+                        if st.button("💾 Update Order", type="primary", key=f"update_order_btn_{selected_order_id}"):
+                            # Clean printers list
+                            printers_clean = []
+                            for p in st.session_state[state_key]:
+                                brand = safe_text(p.get("brand", "")).strip()
+                                model = safe_text(p.get("model", "")).strip()
+                                serial = safe_text(p.get("serial", "")).strip()
+                                if brand or model or serial:
+                                    printers_clean.append({
+                                        "brand": brand,
+                                        "model": model,
+                                        "serial": serial,
+                                    })
+
+                            printers_json = json.dumps(printers_clean, ensure_ascii=False)
+
+                            first_brand = ""
+                            first_model = ""
+                            first_serial = ""
+                            if printers_clean:
+                                first_brand = printers_clean[0]["brand"]
+                                first_model = printers_clean[0]["model"]
+                                first_serial = printers_clean[0]["serial"]
+
                             updates = {
+                                "status": new_status,
+                                "repair_details": repair_details,
+                                "parts_used": parts_used,
+                                "technician": technician,
+                                "labor_cost": labor_cost,
+                                "parts_cost": parts_cost,
                                 "printers_json": printers_json,
                                 "printer_brand": first_brand,
                                 "printer_model": first_model,
                                 "printer_serial": first_serial,
                             }
-                    
+
+                            if new_status == "Ready for Pickup" and not order.get("date_completed"):
+                                updates["date_completed"] = datetime.now().strftime("%Y-%m-%d")
+                            if new_status == "Completed":
+                                updates["date_picked_up"] = (
+                                    actual_pickup_date.strftime("%Y-%m-%d")
+                                    if actual_pickup_date
+                                    else datetime.now().strftime("%Y-%m-%d")
+                                )
+
                             if crm.update_order(selected_order_id, **updates):
-                                st.success("🗑 Imprimantele selectate au fost șterse definitiv.")
+                                st.success("✅ Order updated successfully!")
                                 st.rerun()
+
+                        st.divider()
+                        st.subheader("📄 Download Receipts")
+
+                        # Re-citim comanda proaspăt din sheet pentru PDF-uri actualizate
+                        df_latest = crm._read_df(raw=True, ttl=0)
+                        if df_latest is not None and not df_latest.empty:
+                            mask = df_latest["order_id"] == selected_order_id
+                            if mask.any():
+                                order_latest = df_latest[mask].iloc[0].to_dict()
                             else:
-                                st.error("❌ Eroare la salvarea în Google Sheets!")
+                                order_latest = order  # fallback la varianta veche deja încărcată
+                        else:
+                            order_latest = order
 
+                        logo = st.session_state.get("logo_image", None)
 
-                    with colp_r2:
-                        if st.button("➕ Add printer", key=f"upd_add_printer_btn_{selected_order_id}"):
-                            # Adăugăm un nou printer gol în state și reafișăm UI-ul
-                            printers_list = st.session_state.get(state_key, [])
-                            printers_list.append({"brand": "", "model": "", "serial": ""})
-                            st.session_state[state_key] = printers_list
-                            st.rerun()
-
-                    st.divider()
-
-                    status_options = ["Received", "In Progress", "Ready for Pickup", "Completed"]
-                    current_status = safe_text(order.get("status")) or "Received"
-                    if current_status not in status_options:
-                        current_status = "Received"
-                    status_index = status_options.index(current_status)
-
-                    new_status = st.selectbox(
-                        "Status",
-                        status_options,
-                        index=status_index,
-                        key=f"update_status_{selected_order_id}",
-                    )
-
-                    if new_status == "Completed":
-                        actual_pickup_date = st.date_input(
-                            "Actual Pickup Date",
-                            value=date.today(),
-                            key=f"update_pickup_date_{selected_order_id}",
-                        )
-                    else:
-                        actual_pickup_date = None
-
-                    st.subheader("Repair details")
-
-                    repair_details = st.text_area(
-                        "Repairs performed",
-                        value=safe_text(order.get("repair_details")),
-                        height=100,
-                        key=f"update_repair_details_{selected_order_id}",
-                    )
-
-                    parts_used = st.text_input(
-                        "Parts used",
-                        value=safe_text(order.get("parts_used")),
-                        key=f"update_parts_used_{selected_order_id}",
-                    )
-
-                    technician = st.text_input(
-                        "Technician",
-                        value=safe_text(order.get("technician")),
-                        key=f"update_technician_{selected_order_id}",
-                    )
-
-                    colc1, colc2, colc3 = st.columns(3)
-                    labor_cost = colc1.number_input(
-                        "Labor cost (RON)",
-                        value=safe_float(order.get("labor_cost")),
-                        min_value=0.0,
-                        step=10.0,
-                        key=f"update_labor_cost_{selected_order_id}",
-                    )
-                    parts_cost = colc2.number_input(
-                        "Parts cost (RON)",
-                        value=safe_float(order.get("parts_cost")),
-                        min_value=0.0,
-                        step=10.0,
-                        key=f"update_parts_cost_{selected_order_id}",
-                    )
-                    colc3.metric("💰 Total", f"{labor_cost + parts_cost:.2f} RON")
-
-                    if st.button("💾 Update Order", type="primary", key=f"update_order_btn_{selected_order_id}"):
-                        # Clean printers list (inclusiv ce ai șters sau adăugat în UI)
-                        printers_clean = []
-                        for p in st.session_state[state_key]:
-                            brand = safe_text(p.get("brand", "")).strip()
-                            model = safe_text(p.get("model", "")).strip()
-                            serial = safe_text(p.get("serial", "")).strip()
-                            if brand or model or serial:
-                                printers_clean.append({
-                                    "brand": brand,
-                                    "model": model,
-                                    "serial": serial,
-                                })
-
-                        printers_json = json.dumps(printers_clean, ensure_ascii=False)
-
-                        first_brand = ""
-                        first_model = ""
-                        first_serial = ""
-                        if printers_clean:
-                            first_brand = printers_clean[0]["brand"]
-                            first_model = printers_clean[0]["model"]
-                            first_serial = printers_clean[0]["serial"]
-
-                        updates = {
-                            "status": new_status,
-                            "repair_details": repair_details,
-                            "parts_used": parts_used,
-                            "technician": technician,
-                            "labor_cost": labor_cost,
-                            "parts_cost": parts_cost,
-                            "printers_json": printers_json,
-                            "printer_brand": first_brand,
-                            "printer_model": first_model,
-                            "printer_serial": first_serial,
-                        }
-
-                        if new_status == "Ready for Pickup" and not order.get("date_completed"):
-                            updates["date_completed"] = datetime.now().strftime("%Y-%m-%d")
-                        if new_status == "Completed":
-                            updates["date_picked_up"] = (
-                                actual_pickup_date.strftime("%Y-%m-%d")
-                                if actual_pickup_date
-                                else datetime.now().strftime("%Y-%m-%d")
+                        colp1, colp2 = st.columns(2)
+                        with colp1:
+                            st.markdown("**Initial Receipt**")
+                            pdf_init = generate_initial_receipt_pdf(order_latest, st.session_state["company_info"], logo)
+                            st.download_button(
+                                "📄 Download Initial",
+                                pdf_init,
+                                f"Initial_{order_latest['order_id']}.pdf",
+                                "application/pdf",
+                                use_container_width=True,
+                                key=f"dl_upd_init_{order_latest['order_id']}",
                             )
-
-                        if crm.update_order(selected_order_id, **updates):
-                            st.success("✅ Order updated successfully!")
-                            st.rerun()
-
-                    st.divider()
-                    st.subheader("📄 Download Receipts")
-
-                    # Re-citim comanda proaspăt din sheet pentru PDF-uri actualizate
-                    df_latest = crm._read_df(raw=True, ttl=0)
-                    order_latest = df_latest[df_latest["order_id"] == selected_order_id].iloc[0].to_dict()
-
-                    logo = st.session_state.get("logo_image", None)
-
-                    colp1, colp2 = st.columns(2)
-                    with colp1:
-                        st.markdown("**Initial Receipt**")
-                        pdf_init = generate_initial_receipt_pdf(order_latest, st.session_state["company_info"], logo)
-                        st.download_button(
-                            "📄 Download Initial",
-                            pdf_init,
-                            f"Initial_{order_latest['order_id']}.pdf",
-                            "application/pdf",
-                            use_container_width=True,
-                            key=f"dl_upd_init_{order_latest['order_id']}",
-                        )
-                    with colp2:
-                        st.markdown("**Completion Receipt**")
-                        pdf_comp = generate_completion_receipt_pdf(order_latest, st.session_state["company_info"], logo)
-                        st.download_button(
-                            "📄 Download Completion",
-                            pdf_comp,
-                            f"Completion_{order_latest['order_id']}.pdf",
-                            "application/pdf",
-                            use_container_width=True,
-                            key=f"dl_upd_comp_{order_latest['order_id']}",
-                        )
+                        with colp2:
+                            st.markdown("**Completion Receipt**")
+                            pdf_comp = generate_completion_receipt_pdf(order_latest, st.session_state["company_info"], logo)
+                            st.download_button(
+                                "📄 Download Completion",
+                                pdf_comp,
+                                f"Completion_{order_latest['order_id']}.pdf",
+                                "application/pdf",
+                                use_container_width=True,
+                                key=f"dl_upd_comp_{order_latest['order_id']}",
+                            )
         else:
             st.info("📝 No orders yet.")
 
